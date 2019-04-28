@@ -20,7 +20,7 @@ class ExPage_Gallery extends ExPage_Abstract
 
     public function getType()
     {
-        return $this->find('div#gdc img')->attr('alt');
+        return $this->find('div#gdc div')->text();
     }
 
     public function getThumbnailUrl()
