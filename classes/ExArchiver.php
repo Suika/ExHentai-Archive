@@ -32,7 +32,7 @@ class ExArchiver
         $archivedCount = 0;
 
         //archive unarchived galleries
-        $unarchived = R::find('gallery', '((archived = 0 and download = 1) or hasmeta = 0) and deleted = 0 and source = 0');
+        $unarchived = R::find('gallery', '((archived = 0 and download = 1) or hasmeta = 0) and deleted = 0 and source = 0 ORDER BY exhenid DESC');
         foreach ($unarchived as $gallery) {
             $this->archiveGallery($gallery);
             

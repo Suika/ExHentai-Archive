@@ -13,4 +13,3 @@ sphinx.conf
 .env.example
 phpMyAdmin/
 .idea/
-docker-compose.override.yml

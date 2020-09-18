@@ -20,12 +20,16 @@ class ExPage_Gallery extends ExPage_Abstract
 
     public function getType()
     {
-        return $this->find('div#gdc div')->text();
+        return $this->find('div#gdc .cs')->text();
     }
-
+    
     public function getThumbnailUrl()
     {
-        return $this->find('div#gd1 img')->attr('src');
+        $style = $this->find('div#gd1 div')->attr('style');
+        
+        preg_match('/url\((.*?)\)/', $style, $matches);
+        
+        return $matches[1];
     }
 
     public function getTags()
