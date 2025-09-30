@@ -32,10 +32,10 @@ class ExArchiver
         $archivedCount = 0;
 
         //archive unarchived galleries
-        $unarchived = R::find('gallery', '((archived = 0 and download = 1) or hasmeta = 0) and deleted = 0 and source = 0');
+        $unarchived = R::find('gallery', '((archived = 0 and download = 1) or hasmeta = 0) and deleted = 0 and source = 0 ORDER BY exhenid DESC');
         foreach ($unarchived as $gallery) {
             $this->archiveGallery($gallery);
-            
+
             if ($gallery->archived) {
                 $archivedCount++;
             }
@@ -47,7 +47,7 @@ class ExArchiver
         } else {
             $feeds = R::find('feed', 'disabled = 0 and id = :id', [':id' => $forced_feed]);
         }
-        
+
         foreach ($feeds as $feed) {
             $page = 0;
 
@@ -59,10 +59,10 @@ class ExArchiver
                 if ($feed->expunged) {
                     $params['f_sh'] = 1;
                 }
-                
+
                 $indexHtml = $this->client->index($feed->term, $page, $params);
                 $indexPage = new ExPage_Index($indexHtml);
-                
+
                 $isLastPage = $indexPage->isLastPage();
                 $hasGallery = false;
 
@@ -136,7 +136,7 @@ class ExArchiver
             Log::error(self::LOG_TAG, 'Failed to retrieve page from server');
             return;
         }
-        
+
         $galleryPage = new ExPage_Gallery($galleryHtml);
 
         // save html
@@ -175,26 +175,26 @@ class ExArchiver
                 Log::error(self::LOG_TAG, 'Failed to find archiver link for gallery: %s (#%d)', $gallery->name, $gallery->exhenid);
                 return;
             }
-            
+
             $buttonPress = $this->client->buttonPress($archiverUrl);
 
             if (strpos($buttonPress, 'Insufficient Credits.') !== false) {
                 Log::error(self::LOG_TAG, 'Insufficient Credits');
                 exit;
             }
-            
+
             $archiverPage = new ExPage_Archiver($buttonPress);
 
             $continueUrl = $archiverPage->getContinueUrl();
-            
+
             if ($continueUrl) {
                 if (preg_match("/\?.*/", $continueUrl)) {
                     $continueUrl = preg_replace('/\?.*/', '', $continueUrl);
                 }
                 $archiveDownloadUrl = $continueUrl.'?start=1';
-                
-                $ret = @copy($archiveDownloadUrl, $targetFile);
-                
+                $arrRequestHeaders = array( "ssl"=>array( "verify_peer"=>false, "verify_peer_name"=>false, ) );
+                $ret = @copy($archiveDownloadUrl, $targetFile, stream_context_create($arrRequestHeaders));
+
                 if ($ret) {
                     $archive = new ZipArchive();
                     $ret = $archive->open($targetFile);

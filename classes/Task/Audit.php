@@ -102,6 +102,7 @@ class Task_Audit extends Task_Abstract {
             }
         }
 
+        $gallery->type = $galleryPage->getType();
         $gallery->lastaudit = date('Y-m-d H:i:s');
 
         if ($gallery->deleted == 1) {

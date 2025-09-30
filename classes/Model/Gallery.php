@@ -26,7 +26,7 @@ class Model_Gallery extends Model_Abstract
             $query->sql('select * from galleries');
         }
 
-        $query->sql('where deleted = 0');
+        $query->sql('where deleted < 3');
 
         if (!$unarchived) {
             $query->sql('and archived = 1');
