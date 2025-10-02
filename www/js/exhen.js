@@ -884,19 +884,6 @@ $(document).ready(function() {
 				var pos = imageHolder.position();
 				
 				if (firstImage) {
-					if (this.width > win.width()) {
-						imageHolder.width(win.width());
-					}
-					
-					if (this.height > win.height()) {
-						imageHolder.width((this.width / this.height) * win.height());
-					}
-					
-					imageHolder.css({
-						left : (win.width() - this.width) / 2,
-						top: (win.height() - this.height) / 2
-					});
-					
 					imageHolder.removeClass('init');
 					
 					firstImage = false;
