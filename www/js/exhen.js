@@ -1018,7 +1018,7 @@ $(document).ready(function() {
 		function onScroll() {
 			var scrollTop = pagesContainer.scrollTop();
 			var winHeight = $(window).innerHeight();
-			var inView = false;
+			var inView = -1;
 
 			pages.each(function(i) {
 				var page = pages.eq(i);
@@ -1044,8 +1044,9 @@ $(document).ready(function() {
 				}
 			});
 
-			if(inView) {
+			if(inView >= 0 && inView !== currentIndex) {
 				currentIndex = inView;
+				updatePageCount();
 				setHistoryState(inView, true);
 			}
 		}
@@ -1069,7 +1070,7 @@ $(document).ready(function() {
 			}
 
 			if (mode) {
-				params.resize = Math.ceil(window.screen.availWidth / 128) * 128;
+				params.resize = Math.ceil(window.screen.availWidth * (window.devicePixelRatio || 1) / 128) * 128;
 			}
 
 			return 'api.php?' + $.param(params);
@@ -1162,7 +1163,7 @@ $(document).ready(function() {
 					}
 				});
 			}
-			$('html').removeClass('reader-active');
+			$('html').removeClass('reader-active reader-ui');
 			imageHolder.prop('src', '');
 			gallery = null;
 			$(window).off('.resize');
@@ -1311,23 +1312,53 @@ $(document).ready(function() {
 
 		});
 
-		$('.control-next').click(function() {
+		$('.control-next, .control-hotspot-next', container).click(function() {
 			loadImage(currentIndex + 1, true, false, false, true);
 		});
 
-		$('.control-prev').click(function() {
+		$('.control-prev, .control-hotspot-prev', container).click(function() {
 			loadImage(currentIndex - 1, true, false, false, true);
 		});
 
+		// Touch screens have no hover: a tap on the page (not on a control) shows/hides the title, tags,
+		// thumbnails and actions. The left/right thirds turn pages (CSS makes the hotspots that wide).
+		var touchScreen = window.matchMedia && window.matchMedia('(hover: none)').matches;
+		container.on('click', function(e) {
+			if(touchScreen && $(e.target).is('.reader-container, .image-holder, .pages-container, .pages-container *')) {
+				$('html').toggleClass('reader-ui');
+			}
+		});
+
+		// Swipe left/right in the single page reader. Not while zoomed in (then a swipe pans the page).
+		var swipeStart = null;
+		container.on('touchstart', function(e) {
+			var touches = e.originalEvent.touches;
+			swipeStart = (!mode && touches.length === 1) ? { x: touches[0].clientX, y: touches[0].clientY } : null;
+		});
+		container.on('touchend', function(e) {
+			var touch = e.originalEvent.changedTouches[0];
+			var zoomed = window.visualViewport && window.visualViewport.scale > 1.01;
+			if(!swipeStart || !touch || zoomed || !gallery) {
+				return;
+			}
+
+			var dx = touch.clientX - swipeStart.x;
+			var dy = touch.clientY - swipeStart.y;
+			swipeStart = null;
+			if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+				loadImage(currentIndex + (dx < 0 ? 1 : -1), true, false, false, true);
+			}
+		});
+
 		thumbsList.on('click', '.gallery-thumb', function() {
-			loadImage($(this).data('index'), true, false, !mode, true);
+			loadImage($(this).data('index'), true, false, true, true);
 		});
 
 		$(document).on('keyup.reader', 'html.reader-active', function(e) {
 			if(e.key === 'ArrowRight') {
-				loadImage(currentIndex + 1, true, true, !mode, true);
+				loadImage(currentIndex + 1, true, true, true, true);
 			} else if(e.key === 'ArrowLeft') {
-				loadImage(currentIndex - 1, true, true, !mode, true);
+				loadImage(currentIndex - 1, true, true, true, true);
 			}
 		});
 

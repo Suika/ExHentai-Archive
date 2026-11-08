@@ -864,16 +864,13 @@ input[type="checkbox"].viewtype:checked + div > div {
 }
 
 @media (max-width: 720px) {
-    .gallery-item .top,
-    .gallery-item .bottom {
-        display: none !important;
+    .gallery-item {
+        width: 50%;
+        padding-top: 72.6%;
     }
 	.search-count {
 		float: left;
 	}
-    .gallery-info {
-        display: none;
-    }
 }
 
 @media (max-width: 580px) {
@@ -886,5 +883,85 @@ input[type="checkbox"].viewtype:checked + div > div {
     .search-options {
         flex-grow: 1;
         margin-top: 12px;
+    }
+}
+
+/* Small screens: the result counter sits next to the options toggle instead of under it */
+@media (max-width: 900px) {
+    .search-count {
+        margin-left: 65px;
+    }
+}
+
+/* Phones: the SPV/MPV switch gets its own line below the result counter */
+@media (max-width: 580px) {
+    .search-under {
+        height: auto;
+        min-height: 48px;
+    }
+    .search-under > .switches-outer {
+        position: static;
+        display: block;
+        clear: both;
+        text-align: right;
+        padding-top: 12px;
+    }
+}
+
+/*
+ * Touch screens (no hover): list cards always show their title and read/colour controls, the reader shows
+ * its controls when the page is tapped (html.reader-ui, see exhen.js) and turns pages with taps on the
+ * left/right third or a swipe.
+ */
+@media (hover: none) {
+    .gallery-item .top,
+    .gallery-item .bottom {
+        opacity: 1;
+        padding: 4px 6px;
+    }
+    .gallery-item .top .title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .gallery-item .bottom .tag {
+        display: none;
+    }
+
+    .reader-container .control {
+        display: none !important;
+    }
+    .reader-container .control-hotspot {
+        width: 33%;
+        z-index: 5;
+    }
+    .reader-container .gallery-actions,
+    .gallery-info {
+        display: none;
+    }
+    .reader-container .gallery-actions {
+        right: 10px;
+    }
+    html.reader-ui .reader-container .gallery-actions,
+    html.reader-ui .gallery-info {
+        display: block;
+    }
+    html.reader-ui .gallery-info {
+        top: 60px;
+        max-width: calc(100% - 10px);
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 50;
+    }
+    html.reader-ui .gallery-info .expand {
+        display: block;
+    }
+    /* the thumbnail strip only exists in the multi page reader */
+    html.reader-ui .gallery-thumbs-outer:has(.gallery-thumb) {
+        margin: 0;
+        z-index: 60;
+    }
+    html.reader-ui .gallery-thumbs-outer:has(.gallery-thumb) + .gallery-info {
+        left: 180px;
+        max-width: calc(100% - 190px);
     }
 }

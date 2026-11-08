@@ -6,7 +6,10 @@ frontend, bug fixes) can be changed safely:
 | Suite | What | Needs |
 |---|---|---|
 | `unit` | HTML parsers (gallery, feed index, archiver pages), search escaping, tag diff of Audit, config, ExClient URL seam, image engine (libvips and GD) | nothing |
+| `browser` | the UI in headless Chromium at desktop and phone size (touch, DPR 3): list, infinite scroll, search suggestions, single and multi page reader with keys, taps, swipes and the touch controls, delete switch | the running app stack, Chromium (test image only) |
 | `integration` | API (list, search, filters, paging, gallery, suggestions, stats, reader pages, thumbnails, downloads, write calls) and the tasks (Archive, Audit/ForceAudit, Thumbnails, Cleanup, AddGallery, EditGallery, TaskRunner) | the running app stack, MariaDB, fake ExHentai |
+
+`Support/Browser.php` drives Chromium (chrome-php/chrome); its `screenshot()` helps when changing the layout.
 
 Integration tests talk to the app like its users do: HTTP through nginx and both php-fpm pools, and
 `php TaskRunner.php` for tasks. ExHentai is replaced by a fake server (`fake-exhentai/router.php`) serving the
@@ -20,7 +23,7 @@ Everything runs in Docker (`docker/docker-compose.test.yml`): a MariaDB containe
 ```sh
 cd docker
 docker compose -f docker-compose.test.yml build                      # after Dockerfile/composer/docker config changes
-docker compose -f docker-compose.test.yml run --rm tests             # all tests (~30 s)
+docker compose -f docker-compose.test.yml run --rm tests             # all tests (~45 s)
 docker compose -f docker-compose.test.yml run --rm tests --testsuite unit
 docker compose -f docker-compose.test.yml run --rm tests --filter ApiReadTest
 TEST_MARIADB=11.4 docker compose -f docker-compose.test.yml run --rm tests   # default is 10.3 (prod)

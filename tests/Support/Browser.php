@@ -111,6 +111,7 @@ final class Browser
         $end = microtime(true) + $timeoutMs / 1000;
         do {
             if ($this->js('!!('.$expression.')')) {
+                Assert::assertTrue(true); // counts as an assertion
                 return;
             }
             usleep(50000);
@@ -151,7 +152,9 @@ final class Browser
     public function tap(int $x, int $y): void
     {
         if ($this->phone) {
-            $this->send('Input.synthesizeTapGesture', array('x' => $x, 'y' => $y, 'gestureSourceType' => 'touch'));
+            $point = array(array('x' => $x, 'y' => $y));
+            $this->send('Input.dispatchTouchEvent', array('type' => 'touchStart', 'touchPoints' => $point));
+            $this->send('Input.dispatchTouchEvent', array('type' => 'touchEnd', 'touchPoints' => array()));
         } else {
             foreach (array('mousePressed', 'mouseReleased') as $type) {
                 $this->send('Input.dispatchMouseEvent',

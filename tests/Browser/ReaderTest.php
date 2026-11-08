@@ -2,7 +2,6 @@
 
 namespace Tests\Browser;
 
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\Browser;
 use Tests\Support\BrowserSeed;
@@ -75,14 +74,14 @@ final class ReaderTest extends TestCase
         $b->close();
     }
 
-    #[Group('known-bug')]
     public function testMpvKeyboardScrollsToThePage(): void
     {
         $b = $this->openMpv(Browser::desktop());
 
         $b->key('ArrowRight');
         $b->waitFor('$(".page-count").text() === "2/5"');
-        $b->waitFor('Math.abs($(".pages-container .page").eq(1).position().top) < 5', 3000, 'page 2 is scrolled into view');
+        $b->waitFor('Math.abs($(".pages-container .page")[1].getBoundingClientRect().top) <= 25', 3000,
+            'page 2 is scrolled to the top (20px page gap)');
         $b->close();
     }
 
@@ -107,7 +106,6 @@ final class ReaderTest extends TestCase
         }
     }
 
-    #[Group('known-bug')]
     public function testPhoneSpvTapAndSwipe(): void
     {
         $b = $this->openSpv(Browser::phone());
@@ -128,7 +126,6 @@ final class ReaderTest extends TestCase
         $b->close();
     }
 
-    #[Group('known-bug')]
     public function testPhoneTapShowsReaderControls(): void
     {
         $b = $this->openSpv(Browser::phone());
@@ -138,7 +135,6 @@ final class ReaderTest extends TestCase
         $b->tap(195, 420); // middle
         $b->waitFor('$(".gallery-info .tags").is(":visible") && $(".gallery-actions").is(":visible")', 3000,
             'tap in the middle shows title, tags and actions');
-        $b->waitFor('$(".gallery-thumbs-outer").offset().left >= 0', 3000, 'and the thumbnail strip');
 
         $b->tap(195, 420);
         $b->waitFor('!$(".gallery-info .tags").is(":visible")', 3000, 'a second tap hides them');
@@ -146,8 +142,7 @@ final class ReaderTest extends TestCase
         $b->close();
     }
 
-    #[Group('known-bug')]
-    public function testPhoneMpvRequestsSharpImages(): void
+    public function testPhoneMpvSharpImagesAndThumbnails(): void
     {
         $b = $this->openMpv(Browser::phone());
 
@@ -155,6 +150,12 @@ final class ReaderTest extends TestCase
         $this->assertMatchesRegularExpression('/resize=(\d+)/', $src);
         preg_match('/resize=(\d+)/', $src, $m);
         $this->assertGreaterThanOrEqual(390 * 3, (int)$m[1], 'width in device pixels');
+
+        $b->tap(195, 420);
+        $b->waitFor('$(".gallery-thumbs-outer").offset().left >= 0 && $(".gallery-thumbs-outer .gallery-thumb").length === 5',
+            3000, 'a tap shows the thumbnail strip');
+        $b->js('$(".gallery-thumbs-outer .gallery-thumb").eq(3).click()');
+        $b->waitFor('$(".page-count").text() === "4/5"', 3000, 'a thumbnail jumps to its page');
         $b->close();
     }
 }

@@ -2,7 +2,6 @@
 
 namespace Tests\Browser;
 
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\Browser;
 use Tests\Support\BrowserSeed;
@@ -78,7 +77,6 @@ final class ListTest extends TestCase
         $b->close();
     }
 
-    #[Group('known-bug')]
     public function testPhoneListShowsTitleAndControls(): void
     {
         $b = Browser::phone()->open('/');
