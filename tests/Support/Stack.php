@@ -143,6 +143,30 @@ final class Stack
         return $id;
     }
 
+    /**
+     * Changes values in the "base" section of the app's config.json (the generated one and the public
+     * www/config.json) and returns a function that restores both.
+     */
+    public static function config(array $values): callable
+    {
+        $files = array(APP_ROOT.'/config.json', APP_ROOT.'/www/config.json');
+        $saved = array();
+        foreach ($files as $file) {
+            $saved[$file] = file_get_contents($file);
+            $data = json_decode($saved[$file], true);
+            foreach ($values as $key => $value) {
+                $data['base'][$key] = $value;
+            }
+            file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+
+        return function () use ($saved) {
+            foreach ($saved as $file => $contents) {
+                file_put_contents($file, $contents);
+            }
+        };
+    }
+
     public static function archivePath(string $relative): string
     {
         return APP_ROOT.'/archive/'.$relative;

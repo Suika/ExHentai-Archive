@@ -102,6 +102,10 @@ VOLUME /var/www/exhen/images /var/www/exhen/archive /var/www/exhen/tmp /var/lib/
 # Test image: the app plus PHPUnit and the test suite (see tests/README.md).
 # Build/run: cd docker && docker compose -f docker-compose.test.yml run --rm tests
 FROM app AS test
+# Chromium for the browser tests (tests/Browser), driven through chrome-php/chrome
+RUN apt-get update && \
+    apt-get -y install --no-install-recommends chromium fonts-dejavu-core && \
+    rm -rf /var/lib/apt/lists/*
 COPY --chown=www-data:www-data --from=vendor-dev /app/vendor /var/www/exhen/vendor
 COPY --chown=www-data:www-data tests /var/www/exhen/tests
 COPY --chown=www-data:www-data phpunit.xml.dist /var/www/exhen/
