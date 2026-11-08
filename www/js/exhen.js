@@ -25,6 +25,7 @@ function getConfig() {
         type: 'GET',
         url: 'config.json',
         dataType: 'json',
+        cache: false, // settings change with the container environment
         success: function(data) { return data.responseJSON; },
         data: {},
         async: false
@@ -836,31 +837,39 @@ $(document).ready(function() {
 					if(keywords.length > 0) {
 						var termBits = term.split(' ');
 
-						for(var i in keywords) {
+						for(var i = 0; i < keywords.length; i++) {
 							var keyword = keywords[i];
-							var itemHtml = keyword;
-							var ignoreWord = false;
 
-							for(var x in termBits) {
+							// the longest typed tail that occurs in the keyword gets highlighted
+							var match = null;
+							for(var x = 0; x < termBits.length; x++) {
 								var tempTerm = termBits.slice(x).join(' ');
 								if(keyword.indexOf(tempTerm) >= 0) {
-									if(keyword !== tempTerm) {
-										var regex = new RegExp(tempTerm);
-										itemHtml = itemHtml.split(regex).join('<span class="highlight">' + tempTerm + '</span>');
-									} else {
-										ignoreWord = true;
-									}
-
+									match = tempTerm;
 									break;
 								}
 							}
 
-							if(!ignoreWord) {
-								var li = $('<li/>');
-								li.data('keyword', keyword);
-								li.html(itemHtml);
-								li.appendTo(list);
+							if(match === keyword) {
+								continue; // already typed completely
 							}
+
+							// built from text nodes: typed text and tag names are never treated as HTML or as a
+							// regular expression (a "(" or "+" used to break the list)
+							var li = $('<li/>');
+							li.data('keyword', keyword);
+							if(match) {
+								var parts = keyword.split(match);
+								for(var p = 0; p < parts.length; p++) {
+									if(p > 0) {
+										li.append($('<span class="highlight"/>').text(match));
+									}
+									li.append(document.createTextNode(parts[p]));
+								}
+							} else {
+								li.text(keyword);
+							}
+							li.appendTo(list);
 						}
 
 						if($('> *', list).length > 0) {
@@ -947,6 +956,11 @@ $(document).ready(function() {
 		var scrollProc = null;
 		var scrolling = false;
 		var configData = getConfig();
+		var allowDelete = !!(configData && configData.base && configData.base.allowDelete);
+		if(!allowDelete) {
+			// deleting is switched off on the server (EX_ALLOW_DELETE)
+			$('.actions-menu li[data-action=delete]', container).hide();
+		}
 		// Pages fetched in the background ahead of the current page. Previously the preload continued
 		// page by page to the end of the gallery, i.e. the whole archive was requested on every open.
 		var PRELOAD_AHEAD = 3;
@@ -1357,7 +1371,7 @@ $(document).ready(function() {
 			var trigger = $(this);
 			var action = trigger.data('action');
 
-			if(action == 'delete') {
+			if(action == 'delete' && allowDelete) {
 				var key = prompt('Enter access key');
 				if(key) {
 					api('deletegallery', { id: gallery.id, key: key }, function(data) {

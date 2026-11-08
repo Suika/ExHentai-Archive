@@ -314,7 +314,9 @@ class ApiHandler
     {
         list($id, $key) = $this->getParams('id', 'key');
 
-        if ($key != Config::get()->accessKey) {
+        if (empty(Config::get()->allowDelete)) {
+            $this->sendFail('Delete is disabled');
+        } elseif ($key != Config::get()->accessKey) {
             $this->sendFail('Invalid access key');
         } else {
             $gallery = R::load('gallery', $id);

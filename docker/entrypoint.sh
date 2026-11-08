@@ -3,7 +3,7 @@
 echo "Preparing config files"
 envsubst < /config.json > /var/www/exhen/config.json
 envsubst < /manticore.conf > /etc/manticoresearch/manticore.conf
-printf '{"base":{"autoReadPercentage":%s}}\n' "${EX_READPERCENTAGE:-80}" > /var/www/exhen/www/config.json
+printf '{"base":{"autoReadPercentage":%s,"allowDelete":%s}}\n' "${EX_READPERCENTAGE:-80}" "${EX_ALLOW_DELETE:-0}" > /var/www/exhen/www/config.json
 mkdir -p /etc/manticoresearch /run/manticore /var/lib/sphinxsearch/data/exhen
 cat /nginx.conf > /etc/nginx/nginx.conf
 

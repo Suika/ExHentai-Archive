@@ -36,6 +36,7 @@ services:
       - DB_USER=exhen
       - DB_PASS=exhen
       - EX_ACCESSKEY=test-key
+      - EX_ALLOW_DELETE=1
       - FAKE_EXHENTAI_URL=http://127.0.0.1:8090
       - FAKE_EXHENTAI_STATE=/var/tmp/fake-exhentai
       - UPDATE_SNAPSHOTS

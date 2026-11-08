@@ -7,6 +7,8 @@ The ENVs with __REPLACEME__ and the DB part needs the right parameters. Most you
 SP is your viewing profile (create a second profile and you will get the key in the cookie), 
 the system needs the "Front Page Settings" to be set to Minimal if you want to use the feed feature.
 
+__EX_ALLOW_DELETE__=1 enables the Delete action in the reader (it asks for __EX_ACCESSKEY__); off by default.
+
 __EX_ACCESSKEY__ is the key that will be used by the [userscript.user.js](https://github.com/Sn0wCrack/ExHentai-Archive/blob/master/userscript.user.js)
 
 
@@ -72,6 +74,7 @@ EX_VIEWTYPE=mpv
 EX_MEMBERID=REPLACEME
 EX_PASSHASH=REPLACEME
 EX_ACCESSKEY=REPLACEME
+EX_ALLOW_DELETE=0
 EX_IGNEOUS=REPLACEME
 EX_SK=REPLACEME
 EX_SP=REPLACEME

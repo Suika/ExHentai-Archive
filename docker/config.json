@@ -1,6 +1,7 @@
 {
     "base": {
         "accessKey": "${EX_ACCESSKEY}",
+        "allowDelete": ${EX_ALLOW_DELETE},
         "archiveDir": "${EX_ARCHDIR}",
         "autoReadPercentage": ${EX_READPERCENTAGE},
         "cookie": {

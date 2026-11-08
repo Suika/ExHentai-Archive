@@ -95,7 +95,6 @@ final class ReaderTest extends TestCase
         $b->close();
     }
 
-    #[Group('known-bug')]
     public function testDeleteHiddenWhenDisabled(): void
     {
         $restore = Stack::config(array('allowDelete' => false));

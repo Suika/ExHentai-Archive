@@ -31,7 +31,6 @@ final class ListTest extends TestCase
         $b->close();
     }
 
-    #[Group('known-bug')]
     public function testSuggestionsWithSpecialCharacters(): void
     {
         $b = Browser::desktop()->open('/');
@@ -48,7 +47,6 @@ final class ListTest extends TestCase
         $b->close();
     }
 
-    #[Group('known-bug')]
     public function testSuggestionsAreText(): void
     {
         $b = Browser::desktop()->open('/');

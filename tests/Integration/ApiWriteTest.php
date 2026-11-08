@@ -92,6 +92,19 @@ final class ApiWriteTest extends TestCase
             Api::call('deletegallery', array('id' => $this->gallery, 'key' => self::KEY))['message']);
     }
 
+    public function testDeleteCanBeSwitchedOff(): void
+    {
+        $restore = Stack::config(array('allowDelete' => 0)); // EX_ALLOW_DELETE=0, the default
+        try {
+            $response = Api::call('deletegallery', array('id' => $this->gallery, 'key' => self::KEY));
+        } finally {
+            $restore();
+        }
+
+        $this->assertSame(array('ret' => false, 'message' => 'Delete is disabled'), $response);
+        $this->assertSame('0', (string)Db::gallery($this->gallery)['deleted']);
+    }
+
     public function testFlush(): void
     {
         $this->assertSame('Cache flushed', Api::data('flush'));
