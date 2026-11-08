@@ -6,7 +6,6 @@ io/*
 .vagrant/
 *.box
 .bashrc
-config.json
 www/config.json
 sphinx.conf
 .env
