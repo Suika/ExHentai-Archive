@@ -2,14 +2,18 @@
 // @name       ExHentai Archive
 // @match      *://exhentai.org/*
 // @match      *://e-hentai.org/*
-// @require    https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js
+// @require    https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js
 // ==/UserScript==
 
-var baseUrl = '//your.archive.url.com/';
-var key = 'changeme';
+var baseUrl = '//127.0.0.1/';
+var key = '';
 
-function createArchiveLink(gid, token) {
-    var link = $('<div><a href="#">Send to archive</a></div>');
+function createArchiveLink(gid, token, search=false) {
+    if (search) {
+        var link = $('<div class="cs ct7 gl5t" style="width: 100%; heigh: 30px;"><a href="#">Send to archive</a></div>');
+    } else {
+        var link = $('<a href="#">Send to archive</a>');
+    }
     link.data('gid', gid);
     link.data('token', token);
 
@@ -76,7 +80,6 @@ $('div.itg').each(function() { //gallery search
     galleries.each(function() {
         var galleryContainer = $(this);
         var link = $('a', galleryContainer).prop('href');
-
         var bits = link.split("/");
 
         var gid = bits[4];
@@ -85,30 +88,36 @@ $('div.itg').each(function() { //gallery search
         gids.push(gid);
 
         galleryContainer.data('gid', gid);
+        setTimeout(function(){
+            $.getJSON(baseUrl + 'api.php', { action: 'hasgallery', gid: gid, key: key }, function(data, result) {
+                if (!data.data.exists) {
+                    var link = createArchiveLink(gid, token, true);
+                    link.css({ fontSize: '9px' });
+                    galleryContainer.css({background: 'darkcyan'});
+                    link.on('click', function() {
+                        galleryContainer.css({ background: 'green' });
+                    });
 
-        $.getJSON(baseUrl + 'api.php', { action: 'hasgallery', gid: gid, key: key }, function(data, result) {
-           if (!data.data.exists) {
-              var link = createArchiveLink(gid, token);
-              link.css({ 'text-align': 'center', 'font-size': '12px' });
-              link.on('click', function() {
-                  galleryContainer.css({background: 'green'});
-              });
+                    link.appendTo(galleryContainer);
+                } else {
+                    //galleryContainer.remove(); //cleaning############################################################################################################################################
+                    var res = "";
+                    if (data.data.archived && data.data.deleted == 0) {
+                        galleryContainer.css({background: 'green'});
+                    }
 
-              link.appendTo(galleryContainer);
-           } else {
-             var res = '';
-             if (data.data.archived && data.data.deleted == 0) {
-                res = $('<div><p>Archived</p></div>');
-                galleryContainer.css({background: 'green'});
-             }
+                    if (!data.data.archived && data.data.exists) {
+                        galleryContainer.css({background: 'darkmagenta'});
+                        // galleryContainer.remove(); //cleaning
+                    }
 
-             if (data.data.deleted >= 1) {
-               res = $('<div><p>Deleted</p></div>');
-               galleryContainer.css({background: '#AA0000'});
-             }
-
-             res.appendTo(galleryContainer);
-           }
-        });
+                    if (data.data.deleted >= 1) {
+                        res = $('<div><p>Deleted</p></div>');
+                        galleryContainer.css({background: '#AA0000'});
+                    }
+                    res.appendTo(galleryContainer);
+                }
+            });
+        }, 10);
     });
 });

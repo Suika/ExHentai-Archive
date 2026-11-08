@@ -32,7 +32,7 @@
       - ./exhen/images:/var/www/exhen/images
       - ./exhen/archive:/var/www/exhen/archive
     environment:
-      - DB_HOST=exhen
+      - DB_HOST=exhen-db
       - DB_NAME=exhen
       - DB_USER=exhen
       - DB_PASS=exhen

@@ -1,15 +1,13 @@
 CREATE DATABASE IF NOT EXISTS `exhen` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
 USE `exhen`;
--- MySQL dump 10.13  Distrib 5.5.16, for Win32 (x86)
---
--- Host: localhost    Database: exhen
--- ------------------------------------------------------
--- Server version	5.5.37-0+wheezy1
+-- ExHentai-Archive database schema (MariaDB)
+-- Taken from the production schema (MariaDB 10.3, 2026-11-08): gallery.filesize is bigint so
+-- archives over 4 GiB fit, gallery.name/origtitle are varchar(1024).
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8 */;
+/*!50503 SET NAMES utf8mb4 */;
 /*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
 /*!40103 SET TIME_ZONE='+00:00' */;
 /*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
@@ -23,15 +21,15 @@ USE `exhen`;
 
 DROP TABLE IF EXISTS `feed`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feed` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `term` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `archived` tinyint(4) NOT NULL DEFAULT '0',
-  `disabled` tinyint(4) NOT NULL DEFAULT '0',
-  `download` tinyint(4) NOT NULL DEFAULT '1',
+  `term` varchar(45) DEFAULT NULL,
+  `archived` tinyint(4) NOT NULL DEFAULT 0,
+  `disabled` tinyint(4) NOT NULL DEFAULT 0,
+  `download` tinyint(4) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -40,32 +38,32 @@ CREATE TABLE `feed` (
 
 DROP TABLE IF EXISTS `gallery`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `gallery` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `exhenid` int(11) unsigned DEFAULT NULL,
-  `hash` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `hash` varchar(255) DEFAULT NULL,
+  `name` varchar(1024) DEFAULT NULL,
   `added` datetime DEFAULT NULL,
-  `archived` tinyint(3) unsigned DEFAULT '0',
-  `origtitle` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `archived` tinyint(3) unsigned DEFAULT 0,
+  `origtitle` varchar(1024) DEFAULT NULL,
+  `type` varchar(255) DEFAULT NULL,
   `posted` datetime DEFAULT NULL,
   `numfiles` int(11) DEFAULT NULL,
-  `filesize` int(10) unsigned DEFAULT NULL,
-  `deleted` tinyint(4) DEFAULT '0',
+  `filesize` bigint(20) unsigned DEFAULT NULL,
+  `deleted` tinyint(4) DEFAULT 0,
   `lastaudit` datetime DEFAULT NULL,
   `updated` datetime DEFAULT NULL,
   `feed_id` int(11) unsigned DEFAULT NULL,
-  `hasmeta` tinyint(4) DEFAULT '0',
-  `download` tinyint(4) DEFAULT '1',
-  `source` tinyint(4) DEFAULT '0',
-  `read` tinyint(4) DEFAULT '0',
+  `hasmeta` tinyint(4) DEFAULT 0,
+  `download` tinyint(4) DEFAULT 1,
+  `source` tinyint(4) DEFAULT 0,
+  `read` tinyint(4) DEFAULT 0,
   `color` varchar(255) DEFAULT 'black',
   PRIMARY KEY (`id`),
   UNIQUE KEY `exhenid_UNIQUE` (`exhenid`),
   KEY `index_foreignkey_gallery_feed` (`feed_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=178734 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -74,7 +72,7 @@ CREATE TABLE `gallery` (
 
 DROP TABLE IF EXISTS `gallery_tag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `gallery_tag` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `gallery_id` int(11) unsigned DEFAULT NULL,
@@ -87,7 +85,7 @@ CREATE TABLE `gallery_tag` (
   CONSTRAINT `cons_fk_gallery_tag_gallery_id_id` FOREIGN KEY (`gallery_id`) REFERENCES `gallery` (`id`) ON DELETE SET NULL ON UPDATE SET NULL,
   CONSTRAINT `cons_fk_gallery_tag_namespace_id_id` FOREIGN KEY (`namespace_id`) REFERENCES `tagnamespace` (`id`) ON DELETE SET NULL ON UPDATE SET NULL,
   CONSTRAINT `cons_fk_gallery_tag_tag_id_id` FOREIGN KEY (`tag_id`) REFERENCES `tag` (`id`) ON DELETE SET NULL ON UPDATE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1717865 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -96,7 +94,7 @@ CREATE TABLE `gallery_tag` (
 
 DROP TABLE IF EXISTS `gallery_thumb`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `gallery_thumb` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `index` int(10) unsigned DEFAULT NULL,
@@ -108,7 +106,7 @@ CREATE TABLE `gallery_thumb` (
   KEY `index_foreignkey_gallery_thumb_gallery` (`gallery_id`),
   CONSTRAINT `cons_fk_gallery_thumb_gallery_id_id` FOREIGN KEY (`gallery_id`) REFERENCES `gallery` (`id`) ON DELETE SET NULL ON UPDATE SET NULL,
   CONSTRAINT `cons_fk_gallery_thumb_image_id_id` FOREIGN KEY (`image_id`) REFERENCES `image` (`id`) ON DELETE SET NULL ON UPDATE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=69208 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -117,16 +115,16 @@ CREATE TABLE `gallery_thumb` (
 
 DROP TABLE IF EXISTS `galleryproperty`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `galleryproperty` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `value` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(255) DEFAULT NULL,
+  `value` varchar(255) DEFAULT NULL,
   `gallery_id` int(11) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `index_foreignkey_galleryproperty_gallery` (`gallery_id`),
   CONSTRAINT `cons_fk_galleryproperty_gallery_id_id` FOREIGN KEY (`gallery_id`) REFERENCES `gallery` (`id`) ON DELETE SET NULL ON UPDATE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1072699 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -135,15 +133,15 @@ CREATE TABLE `galleryproperty` (
 
 DROP TABLE IF EXISTS `image`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `image` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `width` int(11) unsigned DEFAULT NULL,
   `height` int(11) unsigned DEFAULT NULL,
-  `type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `filename` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `type` varchar(255) DEFAULT NULL,
+  `filename` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=69208 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -152,12 +150,12 @@ CREATE TABLE `image` (
 
 DROP TABLE IF EXISTS `sph_counter`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sph_counter` (
   `counter_id` int(11) NOT NULL,
   `last_updated` datetime NOT NULL,
   PRIMARY KEY (`counter_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -166,12 +164,12 @@ CREATE TABLE `sph_counter` (
 
 DROP TABLE IF EXISTS `tag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tag` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=65845 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -180,14 +178,15 @@ CREATE TABLE `tag` (
 
 DROP TABLE IF EXISTS `tagnamespace`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tagnamespace` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `similar_weight` tinyint(4) DEFAULT '0',
+  `name` varchar(255) DEFAULT NULL,
+  `similar_weight` tinyint(4) DEFAULT 0,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -198,4 +197,3 @@ CREATE TABLE `tagnamespace` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2014-07-11 20:44:00
