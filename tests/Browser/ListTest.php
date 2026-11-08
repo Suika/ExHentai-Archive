@@ -47,6 +47,23 @@ final class ListTest extends TestCase
         $b->close();
     }
 
+    public function testSuggestionPickedWithKeyboard(): void
+    {
+        $b = Browser::desktop()->open('/');
+        $b->waitFor('$(".gallery-list .gallery-item").length > 0');
+
+        $b->js('$(".search").focus()');
+        $b->type('stock');
+        $b->waitFor('$(".suggestions li").length > 0');
+        $b->key('ArrowDown');
+        $b->key('Enter');
+
+        $b->waitFor('$(".search").val() === "stockings"', 3000, 'the suggestion replaces the typed word');
+        $b->waitFor('$(".gallery-list .gallery-item").length === 1', 5000, 'and the search runs');
+        $this->assertSame(array(), $b->errors());
+        $b->close();
+    }
+
     public function testSuggestionsAreText(): void
     {
         $b = Browser::desktop()->open('/');

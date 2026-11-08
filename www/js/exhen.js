@@ -99,14 +99,12 @@ $.fn.animateRotate = function(angle, duration, easing, complete) {
     
 $(document).ready(function() {
 	
-	var storage = false;
     
     // mpv: true/1
     // spv: false/0
     var mode = false;
     
 	if (typeof(Storage) != "undefined") {
-		storage = true;
         if (localStorage.getItem("viewType") === null) {
             localStorage.setItem("viewType", "spv");
         }
@@ -138,7 +136,7 @@ $(document).ready(function() {
 		for(var ns in tagGroups) {
 			var tags = tagGroups[ns];
 
-			for(var x in tags) {
+			for(var x = 0; x < tags.length; x++) {
 				var tag = tags[x];
 
 				var tagItem = $('<a/>');
@@ -779,7 +777,7 @@ $(document).ready(function() {
 		}
 
 		input.keydown(function(e) {
-			if(e.keyCode === 38) { //arrow up
+			if(e.key === 'ArrowUp') {
 				var selected = $('li.active', list);
 				if(selected.length > 0) {
 					if(selected.is(':not(:first-child)')) {
@@ -790,7 +788,7 @@ $(document).ready(function() {
 				}
 
 				return false;
-			} else if(e.keyCode === 40) { //arrow down
+			} else if(e.key === 'ArrowDown') {
 				var selected = $('li.active', list);
 				if(selected.length > 0) {
 					if(selected.is(':not(:last-child)')) {
@@ -802,7 +800,7 @@ $(document).ready(function() {
 				}
 
 				return false;
-			} else if(e.keyCode === 13) { //enter
+			} else if(e.key === 'Enter') {
 				var selected = $('li.active', list);
 				if(selected.length > 0) {
 					selected.click();
@@ -811,7 +809,7 @@ $(document).ready(function() {
 
                 list.empty();
                 list.removeClass('active');
-			} else if(e.keyCode === 27) { //esc
+			} else if(e.key === 'Escape') {
 				list.empty();
 				list.removeClass('active');
 			}
@@ -825,7 +823,7 @@ $(document).ready(function() {
 				keywordXhr.abort();
 			}
 
-			if(e.keyCode === 13 || e.keyCode === 27) { //enter, esc
+			if(e.key === 'Enter' || e.key === 'Escape') {
 
 			} else if(newTerm && newTerm.length > 1 && newTerm != term) {
 				term = newTerm;
@@ -895,16 +893,12 @@ $(document).ready(function() {
 
 			var newPre = '';
 
-			for(var i in preBits) {
-				if(i === 0) {
-					continue;
-				}
-
+			for(var i = 0; i < preBits.length; i++) {
 				var found = false;
-				for(var x in keywordBits) {
-					if(keywordBits[x].indexOf(preBits[i]) === 0) {
+				for(var x = 0; x < keywordBits.length; x++) {
+					if(keywordBits[x] !== null && keywordBits[x].indexOf(preBits[i]) === 0) {
 						found = true;
-						delete keywordBits[x];
+						keywordBits[x] = null;
 					}
 				}
 
@@ -1043,7 +1037,6 @@ $(document).ready(function() {
 
 							if(nextPage.length > 0 && !nextPage.hasClass('loaded') && !nextPage.hasClass('loading')) {
 								loadImage(i + 1, false, true, false, true);
-                                $('.page-count').text((parseInt(i) + 1) + "/" + gallery.numfiles);
 								return false;
 							}
 						}
@@ -1099,6 +1092,10 @@ $(document).ready(function() {
 			}
 		}
 
+		function updatePageCount() {
+			$('.page-count').text((currentIndex + 1) + '/' + gallery.numfiles);
+		}
+
 		function loadImage(index, setHistory, replaceHistory, scroll, updateCurIndex) {
 			if(gallery && index < gallery.numfiles && index >= 0) {
                 if (!mode) {
@@ -1135,9 +1132,10 @@ $(document).ready(function() {
 					setHistoryState(index, replaceHistory);
 				}
 
-                if(updateCurIndex) {
-				    currentIndex = index;
-                }
+				if(updateCurIndex) {
+					currentIndex = index;
+					updatePageCount();
+				}
 			} else if(index >= gallery.numfiles) {
 				endFlash.removeClass('transition').addClass('active');
 
@@ -1170,7 +1168,6 @@ $(document).ready(function() {
 			$(window).off('.resize');
 			preload.data('index', 0).prop('src', '');
 			$('.gallery-list').trigger('init');
-			$(document).off('mousewheel.reader');
 		}
 
 		$('.close', container).click(close);
@@ -1219,7 +1216,6 @@ $(document).ready(function() {
 			
 			var source = gallerySourceToName(gallery.source);
 			$('.title', infoContainer).text("[" + source + "] "+ gallery.name);
-            $('.page-count').text((parseInt(index) + 1) + "/" + gallery.numfiles);
 			if(gallery.origtitle != gallery.name) {
 				$('.origtitle', infoContainer).show().text(gallery.origtitle);
 			} else {
@@ -1233,7 +1229,6 @@ $(document).ready(function() {
 				index = 0;
 			}
             
-            $('.page-count').text((parseInt(index) + 1) + "/" + gallery.numfiles);
             
             if (mode) {
                 var pagesTarget = $('.inner', pagesContainer);
@@ -1318,51 +1313,26 @@ $(document).ready(function() {
 		
 		$('.control-next').click(function() {
 			loadImage(currentIndex + 1, true, false, false, true);
-            $('.page-count').text((currentIndex + 1) + "/" + gallery.numfiles);
 		});
-		
+
 		$('.control-prev').click(function() {
 			loadImage(currentIndex - 1, true, false, false, true);
-            $('.page-count').text((currentIndex + 1) + "/" + gallery.numfiles);
 		});
 
 		thumbsList.on('click', '.gallery-thumb', function() {
-			var index = $(this).data('index');
-			if (!mode) {
-				loadImage(index, true, false, true, true);
-                $('.page-count').text((index + 1) + "/" + gallery.numfiles);
-			} else if (mode) {
-				loadImage(index, true, false, false, true);
-                $('.page-count').text((index + 1) + "/" + gallery.numfiles);
-			}
+			loadImage($(this).data('index'), true, false, !mode, true);
 		});
-		
+
 		$(document).on('keyup.reader', 'html.reader-active', function(e) {
-			if(e.keyCode === 39) { // right arrow or WAS(D)
-				if (!mode) {
-					loadImage(currentIndex + 1, true, true, true, true);
-                    $('.page-count').text((currentIndex + 1) + "/" + gallery.numfiles);
-				} else if (mode) {
-					loadImage(currentIndex + 1, true, true, false, true);
-                    $('.page-count').text((currentIndex + 1) + "/" + gallery.numfiles);
-				}
+			if(e.key === 'ArrowRight') {
+				loadImage(currentIndex + 1, true, true, !mode, true);
+			} else if(e.key === 'ArrowLeft') {
+				loadImage(currentIndex - 1, true, true, !mode, true);
 			}
 		});
-		
-		$(document).on('keyup.reader', 'html.reader-active', function(e) {
-			if(e.keyCode === 37) { // left arrow or W(A)SD
-				if (!mode) {
-					loadImage(currentIndex - 1, true, true, true, true);
-                    $('.page-count').text((currentIndex + 1) + "/" + gallery.numfiles);
-				} else if (mode) {
-					loadImage(currentIndex - 1, true, true, false, true);
-                    $('.page-count').text((currentIndex + 1) + "/" + gallery.numfiles);
-				}
-			}
-		});
-		
+
 		$(document).on('keydown.reader keyup.reader', 'html.reader-active', function(e) {
-			if(e.keyCode === 27) { // ESC
+			if(e.key === 'Escape') {
 				close();
 			}
 		});
@@ -1388,7 +1358,7 @@ $(document).ready(function() {
 			} else if(action == 'similar') {
 				var tagList = [ ];
 				for(var ns in gallery.tags) {
-					for(var i in gallery.tags[ns]) {
+					for(var i = 0; i < gallery.tags[ns].length; i++) {
 						var tag = ns + ':' + gallery.tags[ns][i];
 
 						tag = tag.replace('"', '\\\\"');
@@ -1468,8 +1438,7 @@ $(document).ready(function() {
 	function decodeQuery() {
 		var ret = {};
 		var bits = window.location.search.slice(1).replace(/\+/g, '%20').split('&');
-		for(var i in bits)
-		{
+		for(var i = 0; i < bits.length; i++) {
 			var keyvalue = bits[i].split('=');
 			ret[decodeURIComponent(keyvalue[0])] = keyvalue.length == 1 ? false : decodeURIComponent(keyvalue[1]);
 		}
