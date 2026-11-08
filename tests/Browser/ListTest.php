@@ -77,14 +77,14 @@ final class ListTest extends TestCase
         $b->close();
     }
 
-    public function testPhoneListShowsTitleAndControls(): void
+    public function testPhoneListShowsCoversOnly(): void
     {
         $b = Browser::phone()->open('/');
         $b->waitFor('$(".gallery-list .gallery-item").length > 0');
 
-        $this->assertTrue($b->js('$(".gallery-list .gallery-item .title").first().is(":visible")'), 'title');
-        $this->assertTrue($b->js('$(".gallery-list .gallery-item .color-select").first().is(":visible")'), 'colour');
-        $this->assertTrue($b->js('$(".gallery-list .gallery-item #read-container").first().is(":visible")'), 'read');
+        $this->assertFalse($b->js('$(".gallery-list .gallery-item .top").first().is(":visible")'), 'no title bar');
+        $this->assertFalse($b->js('$(".gallery-list .gallery-item .bottom").first().is(":visible")'), 'no tag/date bar');
+        $this->assertSame(2, $b->js('Math.round(window.innerWidth / $(".gallery-list .gallery-item").first().outerWidth())'), 'two columns');
         $this->assertSame(0, $b->js('document.documentElement.scrollWidth - window.innerWidth'), 'no horizontal scrolling');
         $b->close();
     }

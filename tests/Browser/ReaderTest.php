@@ -136,6 +136,11 @@ final class ReaderTest extends TestCase
         $b->waitFor('$(".gallery-info .tags").is(":visible") && $(".gallery-actions").is(":visible")', 3000,
             'tap in the middle shows title, tags and actions');
 
+        $this->assertGreaterThanOrEqual(388, $b->js('$(".gallery-info").outerWidth()'), 'title and tags use the full width');
+        $this->assertGreaterThan($b->js('$(".gallery-actions").offset().top + $(".gallery-actions").outerHeight()'),
+            $b->js('$(".gallery-info").offset().top'), 'below the page counter and actions');
+        $this->assertGreaterThanOrEqual(28, $b->js('$(".gallery-info .tag").first().outerHeight()'), 'tags are big enough to tap');
+
         $b->tap(195, 420);
         $b->waitFor('!$(".gallery-info .tags").is(":visible")', 3000, 'a second tap hides them');
         $this->assertSame('1/5', $b->js('$(".page-count").text()'), 'middle taps do not turn pages');

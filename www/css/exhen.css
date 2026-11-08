@@ -868,6 +868,11 @@ input[type="checkbox"].viewtype:checked + div > div {
         width: 50%;
         padding-top: 72.6%;
     }
+    /* covers only, like before (title and tags need hover, which phones don't have) */
+    .gallery-item .top,
+    .gallery-item .bottom {
+        display: none !important;
+    }
 	.search-count {
 		float: left;
 	}
@@ -914,20 +919,6 @@ input[type="checkbox"].viewtype:checked + div > div {
  * left/right third or a swipe.
  */
 @media (hover: none) {
-    .gallery-item .top,
-    .gallery-item .bottom {
-        opacity: 1;
-        padding: 4px 6px;
-    }
-    .gallery-item .top .title {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .gallery-item .bottom .tag {
-        display: none;
-    }
-
     .reader-container .control {
         display: none !important;
     }
@@ -946,11 +937,28 @@ input[type="checkbox"].viewtype:checked + div > div {
     html.reader-ui .gallery-info {
         display: block;
     }
+    /* title and tags in a full width block below the page counter / actions row */
     html.reader-ui .gallery-info {
         top: 60px;
-        max-width: calc(100% - 10px);
+        left: 0;
+        right: 0;
+        max-width: none;
+        padding: 8px 10px 4px;
         background: rgba(0, 0, 0, 0.6);
         z-index: 50;
+    }
+    html.reader-ui .gallery-info .title,
+    html.reader-ui .gallery-info .origtitle {
+        font-size: 15px;
+    }
+    html.reader-ui .gallery-info .tags {
+        max-width: none;
+        font-size: 15px;
+    }
+    html.reader-ui .gallery-info .tag {
+        padding: 6px 10px;
+        margin: 0 6px 6px 0;
+        border-radius: 4px;
     }
     html.reader-ui .gallery-info .expand {
         display: block;
@@ -962,6 +970,5 @@ input[type="checkbox"].viewtype:checked + div > div {
     }
     html.reader-ui .gallery-thumbs-outer:has(.gallery-thumb) + .gallery-info {
         left: 180px;
-        max-width: calc(100% - 190px);
     }
 }
