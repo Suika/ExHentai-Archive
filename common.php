@@ -2,7 +2,14 @@
 
 define('DS', DIRECTORY_SEPARATOR);
 
-set_include_path(realpath('lib').PATH_SEPARATOR.get_include_path());
+// Third party libraries (RedBeanPHP, Symfony DomCrawler, Intervention Image) are managed by Composer.
+require __DIR__.DS.'vendor'.DS.'autoload.php';
+
+// RedBeanPHP 5 lives in the RedBeanPHP namespace; keep the global "R" facade used throughout the code.
+if (!class_exists('R', false)) {
+	class_alias(\RedBeanPHP\R::class, 'R');
+}
+
 set_include_path(realpath('classes').PATH_SEPARATOR.get_include_path());
 
 spl_autoload_register(function($className) {
@@ -17,8 +24,6 @@ spl_autoload_register(function($className) {
 if(php_sapi_name() !== 'cli') {
 	//Auth::doAuth();
 }
-
-require 'lib/rb.php';
 
 $config = Config::get();
 

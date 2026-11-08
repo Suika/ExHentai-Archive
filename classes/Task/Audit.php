@@ -6,6 +6,9 @@ class Task_Audit extends Task_Abstract {
 
     protected $client;
 
+    /** Whether an audit also refreshes the gallery type (Task_ForceAudit never did) */
+    protected $updateType = true;
+
     public function run($options = array()) {
         $this->client = new ExClient();
 
@@ -38,7 +41,7 @@ class Task_Audit extends Task_Abstract {
     }
 
     protected function audit($gallery) {
-        Log::debug(self::LOG_TAG, 'Auditing gallery: #%d - %s', $gallery->exhenid, $gallery->name);
+        Log::debug(static::LOG_TAG, 'Auditing gallery: #%d - %s', $gallery->exhenid, $gallery->name);
 
         $galleryHtml = $this->client->gallery($gallery->exhenid, $gallery->hash);
 
@@ -47,7 +50,7 @@ class Task_Audit extends Task_Abstract {
             $gallery->lastaudit = date('Y-m-d H:i:s'); //gallery was probably deleted, so mark it as audited for now
             R::store($gallery);
 
-            Log::error(self::LOG_TAG, 'Gallery was either removed or was invalid.');
+            Log::error(static::LOG_TAG, 'Gallery was either removed or was invalid.');
             return;
         }
 
@@ -56,7 +59,7 @@ class Task_Audit extends Task_Abstract {
             $gallery->lastaudit = date('Y-m-d H:i:s'); //gallery was probably deleted, so mark it as audited for now
             R::store($gallery);
 
-            Log::error(self::LOG_TAG, 'Gallery was either removed or was invalid.');
+            Log::error(static::LOG_TAG, 'Gallery was either removed or was invalid.');
             return;
         }
 
@@ -67,7 +70,7 @@ class Task_Audit extends Task_Abstract {
             $childPage = new ExPage_Gallery($childHtml);
 
             if ($childPage->isValid()) {
-                Log::debug(self::LOG_TAG, 'New gallery found for gallery (%d): #%d - %s', $childGallery->exhenid, $gallery->exhenid, $gallery->name);
+                Log::debug(static::LOG_TAG, 'New gallery found for gallery (%d): #%d - %s', $childGallery->exhenid, $gallery->exhenid, $gallery->name);
 
                 Model_Gallery::addGallery($childGallery->exhenid, $childGallery->hash);
 
@@ -92,7 +95,7 @@ class Task_Audit extends Task_Abstract {
 
                     $humanDiff = implode(', ', $humanDiff);
 
-                    Log::debug(self::LOG_TAG, 'Different tags found for gallery: #%d - %s (%s)', $gallery->exhenid, $gallery->name, $humanDiff);
+                    Log::debug(static::LOG_TAG, 'Different tags found for gallery: #%d - %s (%s)', $gallery->exhenid, $gallery->name, $humanDiff);
                     $gallery->ownGalleryTag = array();
                     $gallery->addTags($newTags);
 
@@ -102,7 +105,9 @@ class Task_Audit extends Task_Abstract {
             }
         }
 
-        $gallery->type = $galleryPage->getType();
+        if ($this->updateType) {
+            $gallery->type = $galleryPage->getType();
+        }
         $gallery->lastaudit = date('Y-m-d H:i:s');
 
         if ($gallery->deleted == 1) {

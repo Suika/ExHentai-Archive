@@ -5,15 +5,20 @@ class Cache
     private static $instance;
     private $memcache;
     private $connected;
+    private $isMemcached = false;
 
     protected function __construct()
     {
         $this->connected = false;
 
-        if (class_exists('Memcache') || class_exists('MemcachePool')) {
+        if (class_exists('Memcached') || class_exists('Memcache') || class_exists('MemcachePool')) {
             $config = Config::get();
-            if ($config->memcache) {
-                if (class_exists('MemcachePool')) {
+            if (!empty($config->memcache)) {
+                if (class_exists('Memcached')) {
+                    // ext-memcached (PHP 8.5 compatible); values are compressed by default
+                    $memcache = new Memcached();
+                    $this->isMemcached = true;
+                } elseif (class_exists('MemcachePool')) {
                     $memcache = new MemcachePool();
                 } else {
                     $memcache = new Memcache();
@@ -59,7 +64,11 @@ class Cache
     {
         if ($this->connected) {
             $key = $this->createObjectKey($objectType, $objectId);
-            $this->memcache->set($key, $data, MEMCACHE_COMPRESSED, 0);
+            if ($this->isMemcached) {
+                $this->memcache->set($key, $data, 0);
+            } else {
+                $this->memcache->set($key, $data, MEMCACHE_COMPRESSED, 0);
+            }
         }
     }
 
@@ -86,7 +95,11 @@ class Cache
     public function __destruct()
     {
         if ($this->connected) {
-            $this->memcache->close();
+            if ($this->isMemcached) {
+                $this->memcache->quit();
+            } else {
+                $this->memcache->close();
+            }
         }
     }
 }

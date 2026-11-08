@@ -61,7 +61,6 @@ class ExClient
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
         
         $ret = curl_exec($ch);
-        curl_close($ch);
         
         if (strpos($ret, 'Your IP address has been temporarily banned for using automated mirroring/harvesting software and/or failing to heed the overload warning.') !== false) {
             printf("Banned. Waiting a minute before retrying.\n");
@@ -102,7 +101,6 @@ class ExClient
             curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
             
             $ret = curl_exec($ch);
-            curl_close($ch);
             
             return $ret;
         } else {
@@ -126,7 +124,6 @@ class ExClient
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
             
         $ret = curl_exec($ch);
-        curl_close($ch);
     }
     
     public function getArchiveFileSize($url)
@@ -143,7 +140,6 @@ class ExClient
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
         
         $ret = curl_exec($ch);
-        curl_close($ch);
         
         $result = "unknown";
         

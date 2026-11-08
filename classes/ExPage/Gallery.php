@@ -10,26 +10,26 @@ class ExPage_Gallery extends ExPage_Abstract
 
     public function getName()
     {
-        return $this->find('h1#gn')->text();
+        return self::text($this->find('h1#gn'));
     }
 
     public function getOriginalName()
     {
-        return $this->find('h1#gj')->text();
+        return self::text($this->find('h1#gj'));
     }
 
     public function getType()
     {
-        return $this->find('div#gdc .cs')->text();
+        return self::text($this->find('div#gdc .cs'));
     }
     
     public function getThumbnailUrl()
     {
-        $style = $this->find('div#gd1 div')->attr('style');
+        $style = (string)self::attr($this->find('div#gd1 div'), 'style');
         
         preg_match('/url\((.*?)\)/', $style, $matches);
         
-        return $matches[1];
+        return $matches[1] ?? null;
     }
 
     public function getTags()
@@ -40,14 +40,14 @@ class ExPage_Gallery extends ExPage_Abstract
         foreach ($tagRows as $i => $tagRowElem) {
             $tagRow = $tagRows->eq($i);
 
-            $tagNamespace = $tagRow->find('td:first-child')->text();
+            $tagNamespace = self::text($tagRow->filter('td:first-child'));
             $tagNamespace = trim($tagNamespace, ':');
 
             $tags = array();
-            $tagLinks = $tagRow->find('a');
+            $tagLinks = $tagRow->filter('a');
             foreach ($tagLinks as $x => $tagLinkElem) {
                 $tagLink = $tagLinks->eq($x);
-                $tags[] = $tagLink->text();
+                $tags[] = self::text($tagLink);
             }
 
             $ret[$tagNamespace] = $tags;
@@ -63,8 +63,8 @@ class ExPage_Gallery extends ExPage_Abstract
         $attrs = $this->find('td.gdt1');
         foreach ($attrs as $i => $attrElem) {
             $attr = $attrs->eq($i);
-            $propName = trim($attr->text(), ':');
-            $propValue = $attr->next()->text();
+            $propName = trim(self::text($attr), ':');
+            $propValue = self::text(self::next($attr));
 
             $ret[$propName] = $propValue;
         }
@@ -76,7 +76,7 @@ class ExPage_Gallery extends ExPage_Abstract
     {
         $elem = $this->find('a[onclick*="archiver.php"]');
         if (count($elem) > 0) {
-            preg_match("~(https://exhentai.org/archiver.php.*)'~", $elem->attr('onclick'), $matches);
+            preg_match("~(https://exhentai.org/archiver.php.*)'~", (string)self::attr($elem, 'onclick'), $matches);
             if (count($matches) >= 2) {
                 return $matches[1];
             }
@@ -87,9 +87,9 @@ class ExPage_Gallery extends ExPage_Abstract
 
     public function getNewestVersion()
     {
-        $elem = $this->find('div#gnd a:last');
+        $elem = $this->find('div#gnd a')->last(); // was phpQuery's jQuery-only ':last'
         if (count($elem) === 1) {
-            preg_match("~https://exhentai.org/g/(\d*)/(\w*)/~", $elem->attr('href'), $matches);
+            preg_match("~https://exhentai.org/g/(\d*)/(\w*)/~", (string)self::attr($elem, 'href'), $matches);
 
             $ret =new stdClass();
             $ret->exhenid = $matches[1];

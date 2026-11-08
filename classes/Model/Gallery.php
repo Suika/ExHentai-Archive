@@ -1,6 +1,6 @@
 <?php
 
-use PHPImageWorkshop\ImageWorkshop;
+use Intervention\Image\Encoders\JpegEncoder;
 
 class Model_Gallery extends Model_Abstract
 {
@@ -33,8 +33,9 @@ class Model_Gallery extends Model_Abstract
         }
         
         if ($read !== false) {
+            // "read" is a string attribute in the search index; Manticore rejects comparing it with an integer
             $query->sql('and read = :read')
-                ->addParams(array('read' => $read));
+                ->addParams(array('read' => array((string)$read, PDO::PARAM_STR)));
         }
         
         if ($color !== false) {
@@ -73,10 +74,18 @@ class Model_Gallery extends Model_Abstract
             $query->sql('option ranker = none,');
         }
 
-        $query->sql('max_matches = 500000');
+        $maxMatches = 500000;
+        $query->sql('max_matches = '.$maxMatches);
 
         $result = SphinxQL::query($query->getSql(), $query->getParams());
         $meta = SphinxQL::getMeta();
+
+        // Sphinx 2.2 reported "total" as all retrievable matches (total_found capped by max_matches);
+        // Manticore reports only the rows of the current page. The API's "end" flag and the result
+        // counter rely on the Sphinx meaning, so restore it.
+        if (isset($meta->total_found)) {
+            $meta->total = (string)min((int)$meta->total_found, $maxMatches);
+        }
 
         return array('result' => $result, 'meta' => $meta);
     }
@@ -91,28 +100,121 @@ class Model_Gallery extends Model_Abstract
         }
     }
 
-    public function getImageFilepath($index)
+    /** page list of the last opened archive (Thumbnails reads every page of a gallery in one process) */
+    private static $entryCache = array();
+
+    /**
+     * File entries of the gallery archive in page order (natural, case-insensitive sort by name).
+     *
+     * Archives are read with ZipArchive (libzip). The previously used Phar could not read ZIP64 archives,
+     * which every zip over 4 GB is ("phar error: corrupted central directory entry, no magic signature").
+     *
+     * @return string[] entry names
+     */
+    public function getImageEntries()
     {
         $zipPath = $this->getArchiveFilepath();
-        if (file_exists($zipPath)) {
-            $files = array();
-
-            $zip = new PharData($zipPath);
-            if ($zip) {
-                foreach ($zip as $file) {
-                    $files[] = basename($file);
-                }
-
-                natcasesort($files);
-                $files = array_values($files); //strip keys
-
-                if (array_key_exists($index, $files)) {
-                    return sprintf('phar://%s/%s', $zipPath, $files[$index]);
-                }
-            }
+        if (!file_exists($zipPath)) {
+            return array();
         }
 
-        return false;
+        clearstatcache(true, $zipPath);
+        $key = $zipPath.'|'.filemtime($zipPath).'|'.filesize($zipPath);
+
+        if (!isset(self::$entryCache[$key])) {
+            $names = array();
+
+            $zip = new ZipArchive();
+            if ($zip->open($zipPath, ZipArchive::RDONLY) === true) {
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $name = $zip->getNameIndex($i);
+                    if ($name !== false && substr($name, -1) !== '/') { // skip directory entries
+                        $names[] = $name;
+                    }
+                }
+                $zip->close();
+            }
+
+            natcasesort($names);
+            self::$entryCache = array($key => array_values($names));
+        }
+
+        return self::$entryCache[$key];
+    }
+
+    /**
+     * @return array|false page info: archive (zip path), name (entry name), size, mtime
+     */
+    public function getImageEntry($index)
+    {
+        $entries = $this->getImageEntries();
+        if (!is_numeric($index) || !array_key_exists((int)$index, $entries)) {
+            return false;
+        }
+
+        $zipPath = $this->getArchiveFilepath();
+        $name = $entries[(int)$index];
+
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath, ZipArchive::RDONLY) !== true) {
+            return false;
+        }
+        $stat = $zip->statName($name);
+        $zip->close();
+
+        if ($stat === false) {
+            return false;
+        }
+
+        return array('archive' => $zipPath, 'name' => $name, 'size' => $stat['size'], 'mtime' => $stat['mtime']);
+    }
+
+    /**
+     * @return string|false the page's file contents
+     */
+    public function getImageData($index)
+    {
+        $entry = $this->getImageEntry($index);
+        if (!$entry) {
+            return false;
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($entry['archive'], ZipArchive::RDONLY) !== true) {
+            return false;
+        }
+        $data = $zip->getFromName($entry['name']);
+        $zip->close();
+
+        return $data;
+    }
+
+    /**
+     * Sends the page's file contents to the output, streamed (large originals are not loaded into memory).
+     *
+     * @return bool
+     */
+    public function outputImage($index)
+    {
+        $entry = $this->getImageEntry($index);
+        if (!$entry) {
+            return false;
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($entry['archive'], ZipArchive::RDONLY) !== true) {
+            return false;
+        }
+
+        // the stream reads through the open archive, so it has to stay open until the stream is done
+        $stream = $zip->getStream($entry['name']);
+        if ($stream) {
+            fpassthru($stream);
+            fclose($stream);
+        }
+        $zip->close();
+
+        return (bool)$stream;
     }
 
     public function getImageBean($index)
@@ -130,25 +232,29 @@ class Model_Gallery extends Model_Abstract
 
                 return $link->image;
             } elseif ($create) {
-                $inFile = $this->getImageFilepath($index);
+                $imageData = $this->getImageData($index);
 
-                if (file_exists($inFile)) {
+                if ($imageData !== false && $imageData !== '') {
                     $resizedFilename = sprintf('resized_gallery_%d_%d.jpg', $this->id, $index);
 
-                    $layer = ImageWorkshop::initFromPath($inFile);
+                    $layer = ImageTool::loadData($imageData);
+                    unset($imageData);
 
                     if ($type == self::THUMB_LARGE) {
-                        $layer->resizeInPixel(350, null, true);
+                        $layer->scale(width: 350);
                     } elseif ($type == self::THUMB_SMALL) {
-                        $layer->resizeInPixel(140, null, true);
+                        $layer->scale(width: 140);
                     } else {
                         return false;
                     }
 
                     $tempDir = Config::get()->tempDir;
-                    $layer->save($tempDir, $resizedFilename, true, null, 95);
+                    if (!is_dir($tempDir)) {
+                        mkdir($tempDir, 0777, true);
+                    }
 
                     $outFile = $tempDir.DS.$resizedFilename;
+                    $layer->encode(new JpegEncoder(quality: 95))->save($outFile);
                     $image = Model_Image::importFromFile($outFile);
 
                     unlink($outFile);
@@ -271,15 +377,16 @@ class Model_Gallery extends Model_Abstract
     {
         $tagLinks = $this->ownGalleryTag;
 
-        R::preload($tagLinks, array('namespace' => 'tagnamespace'));
-
         $export = array();
         foreach ($tagLinks as $link) {
-            if (!array_key_exists($link->namespace->name, $export)) {
-                $export[$link->namespace->name] = array();
+            // gallery_tag.namespace_id references the tagnamespace table
+            $namespace = $link->fetchAs('tagnamespace')->namespace;
+
+            if (!array_key_exists($namespace->name, $export)) {
+                $export[$namespace->name] = array();
             }
 
-            $export[$link->namespace->name][] = $link->tag->name;
+            $export[$namespace->name][] = $link->tag->name;
         }
 
         return $export;

@@ -31,6 +31,41 @@ function getConfig() {
     }).responseJSON;
 }
 
+/**
+ * Lazy background images: the image is only requested once the element scrolls into (or near) view.
+ * root: the scrolling element (null = the browser window), margin: how far ahead to start loading.
+ * Without IntersectionObserver (very old browsers) images load immediately, as before.
+ */
+function createLazyBackgrounds(root, margin) {
+    if (!('IntersectionObserver' in window)) {
+        return {
+            add: function(el, url) { $(el).css('background-image', 'url(' + url + ')'); },
+            reset: function() { }
+        };
+    }
+
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+                var el = $(entry.target);
+                el.css('background-image', 'url(' + el.data('lazy-bg') + ')');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { root: root || null, rootMargin: margin || '0px' });
+
+    return {
+        add: function(el, url) {
+            $(el).data('lazy-bg', url);
+            observer.observe($(el)[0]);
+        },
+        // stop watching everything (e.g. when the list is cleared)
+        reset: function() {
+            observer.disconnect();
+        }
+    };
+}
+
 function getRotationDegrees(obj) {
     var matrix = obj.css("-webkit-transform") ||
     obj.css("-moz-transform")    ||
@@ -195,6 +230,21 @@ $(document).ready(function() {
         var color = false;
         var read = false;
         var preloadedPages = { };
+        // covers are requested when a card comes within ~300px (about one row) of the viewport
+        var lazyCovers = createLazyBackgrounds(null, '300px 0px');
+        // background request for the next page (kept apart from xhr, so loading a page doesn't abort it)
+        var preloadXhr = null;
+        var preloadXhrPage = null;
+
+        // forget preloaded/preloading pages, e.g. when the search or the filters change
+        function resetPreload() {
+            if(preloadXhr) {
+                preloadXhr.abort();
+            }
+            preloadXhr = null;
+            preloadXhrPage = null;
+            preloadedPages = { };
+        }
 
 		function loadPage(fwd) {
 			loading = true;
@@ -339,9 +389,7 @@ $(document).ready(function() {
 							item.addClass('landscape');
 						}
 
-						item.css({
-							backgroundImage: 'url(' + gallery.thumb.url + ')'
-						})
+						item.data('cover', gallery.thumb.url)
 					} else {
                         if(gallery.archived == 1) {
                             var url = 'api.php?' + $.param({ action: 'gallerythumb', id: gallery.id, index: 0, type: 1 });
@@ -349,9 +397,7 @@ $(document).ready(function() {
                             var url = 'api.php?' + $.param({ action: 'exgallerythumb', id: gallery.id });
                         }
 
-						item.css({
-							backgroundImage: 'url(' + url + ')'
-						});
+						item.data('cover', url);
 					}
 
 					var tagList = $('.tags', item);
@@ -365,6 +411,10 @@ $(document).ready(function() {
 				} else {
 					galleryList.prepend(collection);
 				}
+
+				$.each(collection, function(i, item) {
+					lazyCovers.add(item, item.data('cover'));
+				});
 
 				if(galleries.length > 0) {
 					if(!history.state || history.state.action == 'galleries') {
@@ -409,14 +459,31 @@ $(document).ready(function() {
 					delete preloadedPages[params.page];
 
 					params.page++;
-					xhr = api('galleries', params, function(result) {
-						preloadedPages[params.page] = result;
+					var preloadPage = params.page;
+					preloadXhrPage = preloadPage;
+					preloadXhr = api('galleries', params, function(result) {
+						preloadedPages[preloadPage] = result;
+					});
+					preloadXhr.always(function() {
+						if(preloadXhrPage === preloadPage) {
+							preloadXhr = null;
+							preloadXhrPage = null;
+						}
 					});
 				}
             }
 
             if(preloadedPages[params.page]) {
             	renderResult(preloadedPages[params.page]);
+            } else if(fwd && preloadXhr && preloadXhrPage === params.page) {
+            	// The next page is already being preloaded: wait for that request instead of aborting it and
+            	// requesting the same page again (this caused abort/restart loops when scrolling fast).
+            	xhr = preloadXhr;
+            	preloadXhr.done(function(resp) {
+            		if(resp && resp.ret) {
+            			renderResult(resp.data);
+            		}
+            	});
             } else {
             	xhr = api('galleries', params, function(result) {
 					renderResult(result);
@@ -478,10 +545,11 @@ $(document).ready(function() {
 		searchForm.submit(function() {
 			search = $('.search', searchForm).val();
 			searchCount.hide();
+			lazyCovers.reset();
 			galleryList.empty();
 			page = 0;
 			topPage = 0;
-			preloadedPages = { };
+			resetPreload();
 			randomiseSeed();
 			loadPage(true);
 			setHistory(false);
@@ -620,7 +688,9 @@ $(document).ready(function() {
 
 			$('.search').val(search);
 			searchCount.hide();
+			lazyCovers.reset();
 			galleryList.empty();
+			resetPreload();
 			loadPage(true);
 
 			if(!history.state || history.state.action != 'galleries') {
@@ -877,21 +947,24 @@ $(document).ready(function() {
 		var scrollProc = null;
 		var scrolling = false;
 		var configData = getConfig();
+		// Pages fetched in the background ahead of the current page. Previously the preload continued
+		// page by page to the end of the gallery, i.e. the whole archive was requested on every open.
+		var PRELOAD_AHEAD = 3;
+		// thumbnail strip images are requested when they scroll into view inside the strip
+		var lazyThumbs = createLazyBackgrounds(thumbsList[0], '600px');
 		
 		imageHolder.on('load', function() {
 			if (this.width > 0 && this.height > 0) {
-				var win = $(window);
-				var pos = imageHolder.position();
-				
 				if (firstImage) {
 					imageHolder.removeClass('init');
 					
 					firstImage = false;
-				} else if (this.height > win.height() || pos.top < 0) {
-					imageHolder.stop().animate({
-						top: 0
-					}, Math.abs(pos.top) * 0.7);
 				}
+
+				// The image is fitted and centred by CSS (max-width/max-height 100%, top/left 50% + translate).
+				// This used to move it with pixel positions (top: 0 for tall images), which broke the fit once
+				// the window size or orientation changed; drop any leftover inline position.
+				imageHolder.stop().css({ top: '', left: '' });
 			}
 			preloadImage(currentIndex + 1);
 		});
@@ -908,7 +981,7 @@ $(document).ready(function() {
 		}
 
 		function preloadImage(index) {
-			if(index < gallery.numfiles) {
+			if(gallery && index < gallery.numfiles && index <= currentIndex + PRELOAD_AHEAD) {
 				preload.data('index', index);
 				preload.prop('src', getImageUrl(index));
 			}
@@ -1118,17 +1191,15 @@ $(document).ready(function() {
 			$('html').addClass('reader-active');
             
             if (mode) {
+                lazyThumbs.reset();
                 thumbsList.empty();
                 for(var i = 0; i < gallery.numfiles; i++) {
                     var url = 'api.php?' + $.param({ action: 'gallerythumb', id: gallery.id, index: i, type: 2 });
 
                     var thumb = $('<div class="gallery-thumb"/>');
                     thumb.data('index', i);
-                    thumb.css({
-                        backgroundImage: 'url(' + url + ')'
-                    });
-
                     thumb.appendTo(thumbsList);
+                    lazyThumbs.add(thumb, url);
                 }
             }
 			
@@ -1179,24 +1250,52 @@ $(document).ready(function() {
 		
         if (!mode) {
             var win = $(window);
+            // Screen size/orientation changes: CSS refits and recentres the image by itself, the old code
+            // shifted it by pixel offsets here, which pushed it out of place. Only clear inline positions.
             win.on('resize.reader', function() {
-                var width = win.width();
-                var height = win.height();
-                var oldWidth = win.data('oldWidth');
-                var oldHeight = win.data('oldHeight');
-            
-                if (oldWidth && oldHeight) {
-                    imageHolder.css({
-                        top: '+=' + ((height - oldHeight) / 2),
-                        left: '+=' + ((width - oldWidth) / 2)
-                    });
-                }
-                
-                
-                win.data('oldWidth', width)
-                win.data('oldHeight', height);
+                imageHolder.css({ top: '', left: '' });
             });
         }
+
+		// Images are requested resized for the screen they were opened on (multi-page reader always,
+		// single-page reader on screens up to 1000px). CSS can shrink them but not enlarge them, so after
+		// moving to a bigger screen or rotating, re-request the visible images at the new size.
+		function requestedWidth(url) {
+			var match = /[?&]resize=(\d+)/.exec(url || '');
+			return match ? parseInt(match[1], 10) : Infinity; // no resize parameter: original image
+		}
+
+		var refitProc = null;
+		$(window).on('resize.readerimages', function() {
+			clearTimeout(refitProc);
+			refitProc = setTimeout(function() {
+				if (!gallery) {
+					return;
+				}
+
+				if (!mode) {
+					var url = getImageUrl(currentIndex);
+					if (requestedWidth(url) > requestedWidth(imageHolder.attr('src'))) {
+						imageHolder.prop('src', url);
+					}
+				} else if (pages) {
+					pages.each(function(i) {
+						var page = pages.eq(i);
+						var img = page.find('img');
+						var url = getImageUrl(i);
+
+						if (requestedWidth(url) <= requestedWidth(img.data('src'))) {
+							return;
+						}
+
+						img.data('src', url); // pages not loaded yet use the new size when they load
+						if (page.hasClass('loaded') && i >= currentIndex - 1 && i <= currentIndex + PRELOAD_AHEAD) {
+							img.prop('src', url);
+						}
+					});
+				}
+			}, 300);
+		});
 
 		container.on('loadgallery', function(e, newGallery, index) {
 			loadGallery(newGallery, index);

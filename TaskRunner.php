@@ -17,12 +17,12 @@ if (isset($_GET["task"])) {
     $web = true;
 }
 
-if($argc < 2 && !$web) {
+if(($argc ?? 0) < 2 && !$web) {
 	printf("Usage: TaskRunner.php <name of task>\n");
     printf("List of avaliable Tasks: \n");
     $tasks = array_diff(scandir("./classes/Task"), array("..", "."));
-    for ($i = 2; $i < count($tasks) + 2; $i++) {
-        printf(" * " . $tasks[$i] . "\n");
+    foreach ($tasks as $taskFile) {
+        printf(" * " . $taskFile . "\n");
     }
     exit;
 }
@@ -44,8 +44,8 @@ if (!file_exists(Config::get()->tempDir)) {
 }
 
 if(file_exists($pidFile)) {
-	$pid = file_get_contents($pidFile);
-	if(processExists($pid)) {
+	$pid = (int)file_get_contents($pidFile);
+	if($pid > 0 && processExists($pid)) {
 		Log::error(LOG_TAG, 'Task already running: %s', $name);
 		exit;
 	}

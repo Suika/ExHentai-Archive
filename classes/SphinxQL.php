@@ -9,7 +9,16 @@ class SphinxQL
     {
         $config = Config::get();
 
-        R::addDatabase('sphinx', $config->sphinxql->dsn, $config->sphinxql->user, $config->sphinxql->pass, true);
+        // Sphinx ignored "dbname=" in the DSN, Manticore rejects it ("no such database"): strip it
+        $dsn = preg_replace('/;?dbname=[^;]*/', '', $config->sphinxql->dsn);
+
+        R::addDatabase('sphinx', $dsn, $config->sphinxql->user, $config->sphinxql->pass, true);
+
+        // Manticore/Sphinx do not support server side prepared statements: make sure PDO emulates them
+        // (this is the pdo_mysql default, set explicitly so it can't silently change).
+        R::selectDatabase('sphinx');
+        R::getPDO()->setAttribute(PDO::ATTR_EMULATE_PREPARES, true);
+        R::selectDatabase('default');
     }
     
     public static function getInstance()

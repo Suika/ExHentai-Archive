@@ -42,6 +42,9 @@ class Task_AddGallery extends Task_Abstract {
 		R::store($gallery);
 
 		$dest = $gallery->getArchiveFilepath();
+		if (!is_dir(dirname($dest))) {
+			mkdir(dirname($dest), 0777, true); // same as ExArchiver, missing on a fresh install
+		}
 		$ret = copy($inputFile, $dest);
 
 		if(!$ret) {

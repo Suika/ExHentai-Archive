@@ -6,7 +6,7 @@ class ExPage_Archiver extends ExPage_Abstract
     {
         $elem = $this->find('#continue a');
         if (count($elem) >= 1) {
-            return $elem->attr('href');
+            return self::attr($elem, 'href');
         } else {
             return false;
         }

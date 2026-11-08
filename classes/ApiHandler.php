@@ -1,6 +1,8 @@
 <?php
 
-use PHPImageWorkshop\ImageWorkshop;
+use Intervention\Image\Encoders\GifEncoder;
+use Intervention\Image\Encoders\JpegEncoder;
+use Intervention\Image\Encoders\PngEncoder;
 
 class ApiHandler
 {
@@ -60,10 +62,6 @@ class ApiHandler
                     );
                 }
 
-                $tagLinks = $gallery->ownGalleryTag;
-
-                R::preload($tagLinks, array('namespace' => 'tagnamespace'));
-
                 $export['tags'] = $gallery->exportTags();
 
                 $export['posted_formatted'] = date('d/m/Y', strtotime($gallery->posted));
@@ -115,15 +113,15 @@ class ApiHandler
         if ($id && $index >= 0) {
             $gallery = R::load('gallery', $id);
             if ($gallery) {
-                $imagePath = $gallery->getImageFilepath($index);
-                if (file_exists($imagePath)) {
+                $entry = $gallery->getImageEntry($index);
+                if ($entry) {
                     header('Pragma: public');
-                    header('Last-Modified: ' . gmdate('D, d M Y H:i:s', filemtime($imagePath)) . ' GMT');
+                    header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $entry['mtime']) . ' GMT');
                     header('Expires: ' . gmdate('D, d M Y H:i:s', time() + 31536000) . ' GMT');
                     header('Cache-Control: max-age=31536000');
 
                     if ($resize && is_numeric($resize) && (int)$resize > 0) {
-                        $ext = pathinfo($imagePath, PATHINFO_EXTENSION);
+                        $ext = pathinfo($entry['name'], PATHINFO_EXTENSION);
 
                         switch ($ext) {
                             default:
@@ -139,30 +137,31 @@ class ApiHandler
                                 break;
                         }
 
-                        $layer = ImageWorkshop::initFromPath($imagePath);
+                        $layer = ImageTool::loadData($gallery->getImageData($index));
                         
-                        if ($layer->getWidth() < $resize) {
-                            $resize = $layer->getWidth();
+                        if ($layer->width() < $resize) {
+                            $resize = $layer->width();
                         }
 
-                        $layer->resizeInPixel($resize, null, true);
-                        $image = $layer->getResult();
+                        $layer->scale(width: (int)$resize);
 
                         switch ($ext) {
                             default:
                             case 'jpg':
                             case 'jpeg':
-                                imagejpeg($image, null, 80); //imagejpeg quality scale 0-100. default 75
+                                $encoder = new JpegEncoder(quality: 80);
                                 break;
                             case 'png':
-                                imagepng($image, null, 8); //imagepng quality scale is 0-9. default 6
+                                $encoder = new PngEncoder();
                                 break;
                             case 'gif':
-                                imagegif($image, null);
+                                $encoder = new GifEncoder();
                                 break;
                         }
+
+                        echo $layer->encode($encoder)->toString();
                     } else {
-                        $ext = pathinfo($imagePath, PATHINFO_EXTENSION);
+                        $ext = pathinfo($entry['name'], PATHINFO_EXTENSION);
 
                         switch ($ext) {
                             default:
@@ -178,7 +177,7 @@ class ApiHandler
                                 break;
                         }
                         
-                        readfile($imagePath);
+                        $gallery->outputImage($index);
                     }
                 } else {
                     http_response_code(404);
@@ -254,12 +253,10 @@ class ApiHandler
                     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
                     
                     $ret = curl_exec($ch);
-                    curl_close($ch);
                     
-                    $im = imagecreatefromstring($ret);
+                    $im = $ret ? imagecreatefromstring($ret) : false;
                     if ($im) {
                         imagejpeg($im);
-                        imagedestroy($im);
                     }
                 } else {
                     http_response_code(404);
@@ -344,7 +341,17 @@ class ApiHandler
                     header('Content-Disposition: attachment; filename="'.$gallery->name.'.zip"');
                     header('Content-Length: '.filesize($archive));
                     
-                    readfile($archive);
+                    // Stream in chunks: on PHP 8 readfile() of a large zip (e.g. 600 MB) can try to
+                    // allocate the whole file and hit memory_limit.
+                    while (ob_get_level() > 0) {
+                        ob_end_flush();
+                    }
+                    $fp = fopen($archive, 'rb');
+                    while (!feof($fp)) {
+                        echo fread($fp, 1048576);
+                        flush();
+                    }
+                    fclose($fp);
                     exit;
                 } else {
                     http_response_code(404);
@@ -473,7 +480,7 @@ class ApiHandler
         $this->sendResponse($data);
     }
 
-    protected function sendFail($message)
+    protected function sendFail($message = '')
     {
         $data = array(
             'ret' => false,

@@ -1,0 +1,32 @@
+{
+    "name": "exhentai-archive/exhentai-archive",
+    "description": "A system for crawling, downloading and viewing ExHentai galleries.",
+    "type": "project",
+    "license": "Unlicense",
+    "require": {
+        "php": ">=8.4.1",
+        "ext-curl": "*",
+        "ext-gd": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-pdo_mysql": "*",
+        "ext-phar": "*",
+        "ext-zip": "*",
+        "gabordemooij/redbean": "^5.7",
+        "intervention/image": "^4.4",
+        "intervention/image-driver-vips": "^4.2",
+        "symfony/css-selector": "^8.1",
+        "symfony/dom-crawler": "^8.1"
+    },
+    "suggest": {
+        "ext-memcached": "Enables the gallery cache (classes/Cache.php)",
+        "ext-posix": "Used by TaskRunner.php to detect already running tasks"
+    },
+    "config": {
+        "platform": {
+            "php": "8.4.1"
+        },
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

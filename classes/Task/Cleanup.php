@@ -60,8 +60,8 @@ class Task_Cleanup extends Task_Abstract {
                     // Delete all associated images and the thumbnails
                     foreach ($images as $image) {
                         $book = R::load('image', $image["id"]);
-                        $imageName = str_pad($book["id"], 6, '0', STR_PAD_LEFT) . '.jpeg';
-                        unlink($config->imagesDir . '/' . $imageName);
+                        // R::trash() runs Model_Image::delete(), which removes the thumbnail file with
+                        // its real extension (.jpeg, .png, ...) if it exists
                         R::trash($book);
                     }
                     $book = R::load('gallery_thumb', $thumb["id"]);
@@ -80,13 +80,17 @@ class Task_Cleanup extends Task_Abstract {
                     R::trash($book);
                 }
                 
-                // Delete archive
-                $archiveName = $gallery["exhenid"] . '.zip';
-                unlink($config->archiveDir . '/galleries/' . $archiveName);
+                // Delete archive (path depends on the source: <exhenid>.zip or <source>-<id>.zip)
+                $archivePath = $gallery->getArchiveFilepath();
+                if (file_exists($archivePath)) {
+                    unlink($archivePath);
+                }
 
-                // Delete html file
-                $htmlName = $gallery["exhenid"] . '.html';
-                unlink($config->archiveDir . '/pages/' . $htmlName);
+                // Delete html file (only exists for ExHentai galleries)
+                $htmlPath = $config->archiveDir . '/pages/' . $gallery["exhenid"] . '.html';
+                if ($gallery["exhenid"] && file_exists($htmlPath)) {
+                    unlink($htmlPath);
+                }
                 
                 if ($gallery["feed_id"] == null) {
                     R::trash($gallery);
@@ -95,7 +99,8 @@ class Task_Cleanup extends Task_Abstract {
                     R::store($gallery);
                 }
                 
-                $cache->deleteObject('gallery', $gallery->id);
+                // R::trash() resets the bean id to 0, so use the id from the query
+                $cache->deleteObject('gallery', $entry["id"]);
                 $count++;
 			}
 			Log::debug(self::LOG_TAG, 'All galleries marked as deleted were deleted. Total deleted was %d', $count);
