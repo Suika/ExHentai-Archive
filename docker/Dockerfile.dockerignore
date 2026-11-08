@@ -1,0 +1,14 @@
+**/.git
+**/.idea
+*.tar.gz
+vendor
+images
+archive
+temp
+tmp
+io
+log.txt
+config.json
+www/config.json
+sphinx.conf
+.env
