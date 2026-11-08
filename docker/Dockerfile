@@ -1,10 +1,16 @@
+# syntax=docker/dockerfile:1
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock* ./
 RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader \
     --ignore-platform-req='ext-*'
 
-FROM debian:trixie-slim
+# Same packages plus the dev dependencies (PHPUnit), only used by the "test" stage
+FROM vendor AS vendor-dev
+RUN composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader \
+    --ignore-platform-req='ext-*'
+
+FROM debian:trixie-slim AS app
 ENTRYPOINT [ "sh", "/entrypoint.sh" ]
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
   CMD wget --quiet --tries=1 --no-check-certificate --spider \
@@ -49,7 +55,7 @@ COPY docker/php.ini /etc/php/8.4/fpm/conf.d/99-exhentai-archive.ini
 COPY docker/php.ini /etc/php/8.4/cli/conf.d/99-exhentai-archive.ini
 COPY docker/php-fpm-pool.conf /etc/php/8.4/fpm/pool.d/zz-exhentai-archive.conf
 
-COPY --chown=www-data:www-data --exclude=docker . /var/www/exhen/
+COPY --chown=www-data:www-data --exclude=docker --exclude=tests --exclude=phpunit.xml.dist . /var/www/exhen/
 COPY --chown=www-data:www-data --from=vendor /app/vendor /var/www/exhen/vendor
 
 RUN mkdir -p /var/www/exhen/images /var/www/exhen/tmp /var/www/exhen/archive /run/php && \
@@ -92,3 +98,16 @@ ENV DB_HOST=mariadb \
     MALLOC_ARENA_MAX=2
 
 VOLUME /var/www/exhen/images /var/www/exhen/archive /var/www/exhen/tmp /var/lib/sphinxsearch/data/exhen
+
+# Test image: the app plus PHPUnit and the test suite (see tests/README.md).
+# Build/run: cd docker && docker compose -f docker-compose.test.yml run --rm tests
+FROM app AS test
+COPY --chown=www-data:www-data --from=vendor-dev /app/vendor /var/www/exhen/vendor
+COPY --chown=www-data:www-data tests /var/www/exhen/tests
+COPY --chown=www-data:www-data phpunit.xml.dist /var/www/exhen/
+COPY docker/test-entrypoint.sh /test-entrypoint.sh
+ENTRYPOINT [ "sh", "/test-entrypoint.sh" ]
+HEALTHCHECK NONE
+
+# The default build target stays the production image
+FROM app

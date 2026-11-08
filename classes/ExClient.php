@@ -6,6 +6,44 @@ class ExClient
 
     private $ctr = 0;
 
+    /**
+     * Optional config (used by the tests to point the client at a fake ExHentai server):
+     *   "exhentai": {"baseUrl": "https://exhentai.org", "throttle": 3}
+     * baseUrl replaces the https://exhentai.org prefix of every request URL (also of links taken from pages,
+     * like the archiver link); throttle is the pause in seconds after every 5 requests (0 disables it).
+     */
+    protected static function setting($name, $default)
+    {
+        $config = Config::get();
+        if (isset($config->exhentai) && isset($config->exhentai->$name)) {
+            return $config->exhentai->$name;
+        }
+
+        return $default;
+    }
+
+    protected function url($url)
+    {
+        $base = rtrim((string)self::setting('baseUrl', self::BASE_URL), '/');
+        if ($base !== self::BASE_URL && strpos($url, self::BASE_URL) === 0) {
+            $url = $base.substr($url, strlen(self::BASE_URL));
+        }
+
+        return $url;
+    }
+
+    protected function throttle()
+    {
+        $this->ctr++;
+        if ($this->ctr > 4) {
+            $seconds = (int)self::setting('throttle', 3);
+            if ($seconds > 0) {
+                sleep($seconds);
+            }
+            $this->ctr = 0;
+        }
+    }
+
     public function index($search = '', $page = 0, $extraParams = array())
     {
         $params = array('page' => $page);
@@ -43,13 +81,9 @@ class ExClient
 
     public function exec($url)
     {
-        $this->ctr++;
-        if ($this->ctr > 4) {
-            sleep(3);
-            $this->ctr = 0;
-        }
+        $this->throttle();
 
-        $ch = curl_init($url);
+        $ch = curl_init($this->url($url));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_FAILONERROR, true);
@@ -80,13 +114,9 @@ class ExClient
     public function buttonPress($url)
     {
         if (strpos($this->exec($url), "dlcheck") !== false) {
-            $this->ctr++;
-            if ($this->ctr > 4) {
-                sleep(3);
-                $this->ctr = 0;
-            }
+            $this->throttle();
             
-            $ch = curl_init($url);
+            $ch = curl_init($this->url($url));
             curl_setopt($ch, CURLOPT_POST, true);
             $post = array("dlcheck" => "true",
                           "dltype" => "org");
@@ -111,7 +141,7 @@ class ExClient
     
     public function invalidateForm($url)
     {
-        $ch = curl_init($url);
+        $ch = curl_init($this->url($url));
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, "invalidate_sessions=1");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -128,7 +158,7 @@ class ExClient
     
     public function getArchiveFileSize($url)
     {
-        $ch = curl_init($url);
+        $ch = curl_init($this->url($url));
         curl_setopt($ch, CURLOPT_NOBODY, true);
         curl_setopt($ch, CURLOPT_HEADER, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

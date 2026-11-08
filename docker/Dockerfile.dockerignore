@@ -12,3 +12,4 @@ config.json
 www/config.json
 sphinx.conf
 .env
+tools

@@ -16,4 +16,4 @@ docker-compose.override.yml
 vendor/
 
 # dev-only helpers (parser golden test), kept local
-tools/
+/tools/

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Run through docker/docker-compose.test.yml, see tests/README.md -->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         cacheDirectory="/tmp/phpunit-cache"
+         executionOrder="default"
+         failOnWarning="true"
+         failOnRisky="true"
+         displayDetailsOnTestsThatTriggerWarnings="true"
+         displayDetailsOnTestsThatTriggerDeprecations="true"
+         displayDetailsOnSkippedTests="true"
+         displayDetailsOnIncompleteTests="true">
+    <testsuites>
+        <testsuite name="unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+
+    <groups>
+        <exclude>
+            <!-- tests for known, not yet fixed bugs; run them with: - -group known-bug -->
+            <group>known-bug</group>
+        </exclude>
+    </groups>
+
+    <source>
+        <include>
+            <directory>classes</directory>
+        </include>
+    </source>
+</phpunit>

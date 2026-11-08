@@ -95,3 +95,9 @@ TZ=Europe/London
 ```
 DOCKER_BUILDKIT=1 docker build -t suika/exhentai-archive:latest https://github.com/Suika/exhentai-archive-docker.git
 ```
+Tests:
+```
+cd docker
+docker compose -f docker-compose.test.yml run --rm tests
+```
+See [tests/README.md](../tests/README.md).
