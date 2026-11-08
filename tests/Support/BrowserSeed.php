@@ -13,10 +13,7 @@ final class BrowserSeed
     {
         Stack::reset();
 
-        // without the directory entry: numfiles (shown as "n/N") counts zip entries including directories (B13)
-        $entries = ZipFactory::standardEntries();
-        unset($entries['pages/']);
-        $id = Stack::seedManualGallery('Browser Test Gallery', $entries,
+        $id = Stack::seedManualGallery('Browser Test Gallery', ZipFactory::standardEntries(),
             array('female:stockings', 'female:<b>bold</b>', 'artist:tester', 'parody:test (series)'));
         Db::exec("update gallery set posted = '2026-01-01 00:00:00' where id = ?", array($id));
 

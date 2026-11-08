@@ -23,7 +23,7 @@ final class EditTasksTest extends TestCase
         $id = Stack::seedManualGallery('Added By Hand', ZipFactory::standardEntries());
 
         $gallery = Api::data('gallery', array('id' => $id));
-        $this->assertSame(array('Added By Hand', '1', '1', '6'),
+        $this->assertSame(array('Added By Hand', '1', '1', '5'),
             array($gallery['name'], (string)$gallery['source'], (string)$gallery['archived'], (string)$gallery['numfiles']));
         $this->assertFileExists(APP_ROOT.'/archive/galleries/1-'.$id.'.zip');
 

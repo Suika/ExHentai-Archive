@@ -29,7 +29,7 @@ class Task_AddGallery extends Task_Abstract {
 		$archive = new ZipArchive();
 		$ret = $archive->open($inputFile);
 		if($ret === true && $archive->status == ZipArchive::ER_OK) {
-			$gallery->numfiles = $archive->numFiles;
+			$gallery->numfiles = Model_Gallery::countPages($archive);
 			$archive->close();
 
 			$gallery->filesize = filesize($inputFile);

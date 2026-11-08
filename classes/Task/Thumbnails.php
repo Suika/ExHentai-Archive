@@ -12,6 +12,15 @@ class Task_Thumbnails extends Task_Abstract {
 		foreach($galleries as $gallery) {
 			$success = true;
 
+			// galleries stored before directories were left out of numfiles counted them as pages
+			$pages = count($gallery->getImageEntries());
+			if ($pages > 0 && $pages != $gallery->numfiles) {
+				Log::debug(self::LOG_TAG, 'Gallery #%d has %d pages, not %d', $gallery->id, $pages, $gallery->numfiles);
+				$gallery->numfiles = $pages;
+				R::store($gallery);
+				Cache::getInstance()->deleteObject('gallery', $gallery->id);
+			}
+
         	for($i = 0; $i < $gallery->numfiles; $i++) {
                 try {
                 	$gallery->getThumbnail($i, 2, true);

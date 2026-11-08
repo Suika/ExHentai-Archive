@@ -2,7 +2,6 @@
 
 namespace Tests\Integration;
 
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\Api;
 use Tests\Support\Db;
@@ -62,12 +61,26 @@ final class ApiImageTest extends TestCase
         $this->assertSame('image/jpeg', self::page(self::$gallery, 0)['headers']['content-type']);
     }
 
-    #[Group('known-bug')]
     public function testContentTypeMatchesThePageFormat(): void
     {
-        // B16: the type comes from the (case sensitive) file extension, unknown ones are sent as image/jpeg
+        // from the file extension, case-insensitive
         $this->assertSame('image/png', self::page(self::$gallery, 1)['headers']['content-type'], '2.PNG');
         $this->assertSame('image/webp', self::page(self::$gallery, 2)['headers']['content-type'], '3.webp');
+        $this->assertSame('image/gif', self::page(self::$gallery, 3)['headers']['content-type'], '4.gif');
+    }
+
+    public function testResizedPagesKeepTheirFormat(): void
+    {
+        $expected = array('1.jpg' => IMAGETYPE_JPEG, '2.PNG' => IMAGETYPE_PNG, '3.webp' => IMAGETYPE_WEBP,
+            '4.gif' => IMAGETYPE_GIF, '10.jpg' => IMAGETYPE_JPEG);
+
+        foreach (ZipFactory::pageOrder() as $index => $name) {
+            $response = self::page(self::$gallery, $index, array('resize' => 100));
+            $info = getimagesizefromstring($response['body']);
+
+            $this->assertSame($expected[$name], $info[2], $name);
+            $this->assertSame($info['mime'], $response['headers']['content-type'], $name);
+        }
     }
 
     public function testResize(): void
@@ -161,9 +174,20 @@ final class ApiImageTest extends TestCase
 
         $this->assertSame(200, $response['status']);
         $this->assertSame('application/zip', $response['headers']['content-type']);
-        $this->assertSame('attachment; filename="Image Test Gallery.zip"', $response['headers']['content-disposition']);
+        $this->assertSame('attachment; filename="Image Test Gallery.zip"; filename*=UTF-8\'\'Image%20Test%20Gallery.zip',
+            $response['headers']['content-disposition']);
         $this->assertSame((string)filesize($file), $response['headers']['content-length']);
         $this->assertSame(file_get_contents($file), $response['body']);
+    }
+
+    public function testDownloadNameWithQuotesAndJapanese(): void
+    {
+        $id = Stack::seedManualGallery('[もも みみ] "Quoted" a/b', ZipFactory::standardEntries());
+
+        $disposition = Api::request('download', array('id' => $id))['headers']['content-disposition'];
+
+        $this->assertSame('attachment; filename="[__ __] _Quoted_ a_b.zip"; '
+            ."filename*=UTF-8''".rawurlencode('[もも みみ] _Quoted_ a_b.zip'), $disposition);
     }
 
     public function testDownloadInvalidRequests(): void

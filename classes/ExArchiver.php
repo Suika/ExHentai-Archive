@@ -199,7 +199,7 @@ class ExArchiver
                     $archive = new ZipArchive();
                     $ret = $archive->open($targetFile);
                     if ($ret === true && $archive->status == ZipArchive::ER_OK) {
-                        $gallery->numfiles = $archive->numFiles;
+                        $gallery->numfiles = Model_Gallery::countPages($archive);
                         $archive->close();
 
                         $gallery->filesize = filesize($targetFile);

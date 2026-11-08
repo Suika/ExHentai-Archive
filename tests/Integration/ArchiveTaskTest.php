@@ -49,10 +49,10 @@ final class ArchiveTaskTest extends TestCase
 
         $row = Db::galleryByExhenid(self::GID);
         $this->assertSame(
-            array('[Momomimi] Pixiv [English]', '[もも みみ]', 'Doujinshi', '2026-11-03 19:38:00', '1', '1', '6'),
+            array('[Momomimi] Pixiv [English]', '[もも みみ]', 'Doujinshi', '2026-11-03 19:38:00', '1', '1', '5'),
             array($row['name'], $row['origtitle'], $row['type'], $row['posted'], (string)$row['hasmeta'],
                 (string)$row['archived'], (string)$row['numfiles']),
-            'numfiles counts the zip entries, including the "pages/" directory'
+            'numfiles counts the pages, not the "pages/" directory entry'
         );
         $this->assertSame((string)filesize($zip), (string)$row['filesize']);
 

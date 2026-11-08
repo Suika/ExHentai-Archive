@@ -60,9 +60,7 @@ docker compose -f docker-compose.test.yml run --rm tests --group known-bug
 | Test | Bug |
 |---|---|
 | `IndexParserTest::testPageWithNextPage`, `testLastPage`, `ArchiveTaskTest::testFeedCrawl` | feed crawl doesn't understand current ExHentai search pages (Compact view, `?next=` pagination) |
-| `ApiWriteTest::testUnknownGalleryIsNotCreated` | B8: update/updateColor/deletegallery with an unknown id create empty galleries |
 | `ApiWriteTest::testReadFilterFollowsUpdateWithoutManualReindex` | B9: reindex started by the web request is never loaded by searchd |
-| `ApiImageTest::testContentTypeMatchesThePageFormat` | B16: Content-Type from the case-sensitive extension, WebP sent as image/jpeg |
 
 ## Fixtures
 

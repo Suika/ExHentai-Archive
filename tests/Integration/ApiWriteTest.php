@@ -105,15 +105,19 @@ final class ApiWriteTest extends TestCase
         $this->assertSame('0', (string)Db::gallery($this->gallery)['deleted']);
     }
 
+    public function testHealthCheck(): void
+    {
+        $this->assertSame(array('database' => true, 'search' => true, 'cache' => true), Api::data('test'));
+    }
+
     public function testFlush(): void
     {
         $this->assertSame('Cache flushed', Api::data('flush'));
     }
 
-    #[Group('known-bug')]
     public function testUnknownGalleryIsNotCreated(): void
     {
-        // B8: R::load() returns an empty bean for unknown ids, which is then stored as a new gallery
+        // R::load() returns an empty bean for unknown ids, which used to be stored as a new gallery (B8)
         $before = Db::count('gallery');
 
         $responses = array(

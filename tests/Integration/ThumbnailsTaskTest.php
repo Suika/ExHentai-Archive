@@ -42,6 +42,20 @@ final class ThumbnailsTaskTest extends TestCase
         $this->assertSame($pages + 1, Db::count('gallery_thumb'));
     }
 
+    public function testCorrectsPageCountOfOlderGalleries(): void
+    {
+        Stack::reset();
+        $id = Stack::seedManualGallery('Old Count', ZipFactory::standardEntries());
+        // stored by an older version: the "pages/" directory entry counted as a page
+        Db::exec('update gallery set numfiles = 6 where id = ?', array($id));
+
+        $result = Stack::task('Thumbnails');
+
+        $this->assertStringContainsString('has 5 pages, not 6', $result['output']);
+        $this->assertSame('5', (string)Db::gallery($id)['numfiles']);
+        $this->assertSame('5', (string)Api::data('gallery', array('id' => $id))['numfiles']);
+    }
+
     public function testCoverFailureIsReported(): void
     {
         Stack::reset();

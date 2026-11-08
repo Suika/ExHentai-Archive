@@ -3,6 +3,7 @@
 use Intervention\Image\Encoders\GifEncoder;
 use Intervention\Image\Encoders\JpegEncoder;
 use Intervention\Image\Encoders\PngEncoder;
+use Intervention\Image\Encoders\WebpEncoder;
 
 class ApiHandler
 {
@@ -89,7 +90,7 @@ class ApiHandler
 
         if ($id) {
             $gallery = R::load('gallery', $id);
-            if (!$gallery) {
+            if (!$gallery->id) {
                 $this->sendFail('Invalid gallery');
             }
 
@@ -112,7 +113,7 @@ class ApiHandler
 
         if ($id && $index >= 0) {
             $gallery = R::load('gallery', $id);
-            if ($gallery) {
+            if ($gallery->id) {
                 $entry = $gallery->getImageEntry($index);
                 if ($entry) {
                     header('Pragma: public');
@@ -120,63 +121,41 @@ class ApiHandler
                     header('Expires: ' . gmdate('D, d M Y H:i:s', time() + 31536000) . ' GMT');
                     header('Cache-Control: max-age=31536000');
 
+                    $ext = strtolower(pathinfo($entry['name'], PATHINFO_EXTENSION));
+
                     if ($resize && is_numeric($resize) && (int)$resize > 0) {
-                        $ext = pathinfo($entry['name'], PATHINFO_EXTENSION);
-
-                        switch ($ext) {
-                            default:
-                            case 'jpg':
-                            case 'jpeg':
-                                header('Content-Type: image/jpeg');
-                                break;
-                            case 'png':
-                                header('Content-Type: image/png');
-                                break;
-                            case 'gif':
-                                header('Content-Type: image/gif');
-                                break;
-                        }
-
                         $layer = ImageTool::loadData($gallery->getImageData($index));
-                        
+
                         if ($layer->width() < $resize) {
                             $resize = $layer->width();
                         }
 
                         $layer->scale(width: (int)$resize);
 
+                        // resized pages keep their format (png, gif, webp), everything else becomes a JPEG
                         switch ($ext) {
-                            default:
-                            case 'jpg':
-                            case 'jpeg':
-                                $encoder = new JpegEncoder(quality: 80);
-                                break;
                             case 'png':
                                 $encoder = new PngEncoder();
+                                $type = 'image/png';
                                 break;
                             case 'gif':
                                 $encoder = new GifEncoder();
+                                $type = 'image/gif';
                                 break;
-                        }
-
-                        echo $layer->encode($encoder)->toString();
-                    } else {
-                        $ext = pathinfo($entry['name'], PATHINFO_EXTENSION);
-
-                        switch ($ext) {
+                            case 'webp':
+                                $encoder = new WebpEncoder(quality: 80);
+                                $type = 'image/webp';
+                                break;
                             default:
-                            case 'jpg':
-                            case 'jpeg':
-                                header('Content-Type: image/jpeg');
-                                break;
-                            case 'png':
-                                header('Content-Type: image/png');
-                                break;
-                            case 'gif':
-                                header('Content-Type: image/gif');
-                                break;
+                                $encoder = new JpegEncoder(quality: 80);
+                                $type = 'image/jpeg';
                         }
-                        
+
+                        $data = $layer->encode($encoder)->toString();
+                        header('Content-Type: '.$type);
+                        echo $data;
+                    } else {
+                        header('Content-Type: '.self::imageContentType($ext));
                         $gallery->outputImage($index);
                     }
                 } else {
@@ -192,13 +171,43 @@ class ApiHandler
         exit;
     }
 
+    /**
+     * Content type of a gallery page by its file extension (case-insensitive); unknown ones as before: JPEG
+     */
+    protected static function imageContentType($ext)
+    {
+        $types = array(
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'avif' => 'image/avif',
+            'bmp' => 'image/bmp',
+        );
+
+        return $types[strtolower($ext)] ?? 'image/jpeg';
+    }
+
+    /**
+     * Content-Disposition for a download: an ASCII-only fallback name for old clients plus the real
+     * (e.g. Japanese) name as RFC 5987 filename*. Quotes, slashes and control characters are replaced.
+     */
+    protected static function attachmentDisposition($filename)
+    {
+        $filename = preg_replace('~[\x00-\x1f\x7f"/\\\\]~', '_', (string)$filename);
+        $ascii = preg_replace('~[^\x20-\x7e]~u', '_', $filename);
+
+        return sprintf('attachment; filename="%s"; filename*=UTF-8\'\'%s', $ascii, rawurlencode($filename));
+    }
+
     protected function gallerythumbAction()
     {
         list($id, $index, $type) = $this->getParams('id', 'index', 'type');
 
         if ($id && $index !== null && in_array($type, array(Model_Gallery::THUMB_LARGE, Model_Gallery::THUMB_SMALL))) {
             $gallery = R::load('gallery', $id);
-            if ($gallery) {
+            if ($gallery->id) {
                 $thumb = $gallery->getThumbnail($index, $type, true);
                 if ($thumb) {
                     if ($index == 0) {
@@ -226,7 +235,7 @@ class ApiHandler
 
         if ($id) {
             $gallery = R::load('gallery', $id);
-            if ($gallery) {
+            if ($gallery->id) {
                 $config = Config::get();
                 $pageFile = sprintf('%s/pages/%d.html', $config->archiveDir, $gallery->exhenid);
 
@@ -320,7 +329,7 @@ class ApiHandler
             $this->sendFail('Invalid access key');
         } else {
             $gallery = R::load('gallery', $id);
-            if (!$gallery || $gallery->deleted >= 1) {
+            if (!$gallery->id || $gallery->deleted >= 1) {
                 $this->sendFail('Gallery not found or already deleted');
             } else {
                 $gallery->deleted = 1;
@@ -336,11 +345,11 @@ class ApiHandler
         $id = $this->getParam('id');
         if ($id) {
             $gallery = R::load('gallery', $id);
-            if ($gallery) {
+            if ($gallery->id) {
                 $archive = $gallery->getArchiveFilepath();
                 if (file_exists($archive)) {
                     header('Content-Type: application/zip');
-                    header('Content-Disposition: attachment; filename="'.$gallery->name.'.zip"');
+                    header('Content-Disposition: '.self::attachmentDisposition($gallery->name.'.zip'));
                     header('Content-Length: '.filesize($archive));
                     
                     // Stream in chunks: on PHP 8 readfile() of a large zip (e.g. 600 MB) can try to
@@ -409,15 +418,32 @@ class ApiHandler
         $this->sendSuccess($stats);
     }
 
+    /**
+     * Health check: database, search index and cache reachable.
+     * (It used to call a gallery method that no longer exists and crashed.)
+     */
     public function testAction()
     {
-        $galleries = R::find('gallery', 'archived = 1');
+        $checks = array();
 
-        foreach ($galleries as $gallery) {
-            $gallery->updateSearch();
+        try {
+            R::getCell('select count(*) from gallery');
+            $checks['database'] = true;
+        } catch (Throwable $e) {
+            $checks['database'] = false;
         }
 
-        die();
+        try {
+            SphinxQL::query('select id from galleries limit 1');
+            $checks['search'] = true;
+        } catch (Throwable $e) {
+            R::selectDatabase('default');
+            $checks['search'] = false;
+        }
+
+        $checks['cache'] = Cache::getInstance()->cacheConnected();
+
+        $this->sendSuccess($checks);
     }
     
     public function updateAction()
@@ -427,7 +453,7 @@ class ApiHandler
         
         $gallery = R::load('gallery', $id);
         
-        if ($gallery) {
+        if ($gallery->id) {
             $gallery->read = $status;
             R::store($gallery);
             
@@ -452,7 +478,7 @@ class ApiHandler
         
         $gallery = R::load('gallery', $id);
         
-        if ($gallery) {
+        if ($gallery->id) {
             $gallery->color = $color;
             R::store($gallery);
             

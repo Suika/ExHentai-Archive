@@ -100,6 +100,23 @@ class Model_Gallery extends Model_Abstract
         }
     }
 
+    /**
+     * Number of pages of an opened archive: its entries without directory entries (the reader shows
+     * numfiles as "n/N" and reads pages through getImageEntries(), which skips directories too).
+     */
+    public static function countPages(ZipArchive $zip)
+    {
+        $count = 0;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = $zip->getNameIndex($i);
+            if ($name !== false && substr($name, -1) !== '/') {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
     /** page list of the last opened archive (Thumbnails reads every page of a gallery in one process) */
     private static $entryCache = array();
 
