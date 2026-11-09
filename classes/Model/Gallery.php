@@ -294,7 +294,11 @@ class Model_Gallery extends Model_Abstract
 
     public function update()
     {
-        $this->updated = date('Y-m-d H:i:s');
+        // The search index picks up changed galleries by comparing "updated" with MariaDB's NOW()
+        // (sph_counter, docker/manticore.conf), so it has to come from the database clock. PHP's date()
+        // uses the container time zone (TZ), which can be ahead of the database (e.g. London summer time
+        // vs UTC): such galleries stayed out of the index until a later reindex.
+        $this->updated = R::getCell('SELECT NOW()');
     }
 
     public function getRoundedId()

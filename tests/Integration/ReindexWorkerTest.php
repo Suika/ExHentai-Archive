@@ -44,6 +44,14 @@ final class ReindexWorkerTest extends TestCase
         $this->assertSame('2', (string)Api::data('galleries')['meta']['total']);
     }
 
+    public function testAppTimeZoneDiffersFromTheDatabase(): void
+    {
+        // makes sure the suite runs with the setup that hid new galleries from the index (PHP ahead of MariaDB)
+        $dbOffset = Db::value("select time_format(timediff(now(), utc_timestamp()), '%H:%i')");
+
+        $this->assertNotSame(ltrim(date('P'), '+'), $dbOffset, 'TZ of the test container (docker-compose.test.yml)');
+    }
+
     public function testRequestsAreCombined(): void
     {
         foreach (array('delta', 'delta', 'full', 'delta') as $kind) {

@@ -429,7 +429,7 @@ class ApiHandler
         $checks = array();
 
         try {
-            R::getCell('select count(*) from gallery');
+            R::getCell('select id from gallery limit 1'); // cheap: used by the Docker health check
             $checks['database'] = true;
         } catch (Throwable $e) {
             $checks['database'] = false;

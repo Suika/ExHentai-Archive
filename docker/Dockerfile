@@ -12,9 +12,10 @@ RUN composer install --no-interaction --no-progress --prefer-dist --optimize-aut
 
 FROM debian:trixie-slim AS app
 ENTRYPOINT [ "sh", "/entrypoint.sh" ]
-HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
-  CMD wget --quiet --tries=1 --no-check-certificate --spider \
-  http://localhost:${NGINX_PORT} || exit 1
+# Healthy when nginx, php-fpm, the database, the search daemon and the cache answer (api.php?action=test)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5m --retries=3 \
+  CMD wget --quiet --tries=1 -O - "http://localhost:${NGINX_PORT}/api.php?action=test" \
+  | grep -q '"database":true,"search":true,"cache":true' || exit 1
 WORKDIR /var/www/exhen
 
 ARG DEBIAN_FRONTEND=noninteractive
