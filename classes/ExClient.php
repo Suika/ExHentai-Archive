@@ -6,6 +6,10 @@ class ExClient
 
     private $ctr = 0;
 
+    /** HTTP status and curl error of the last exec() request, for log messages */
+    public $lastStatus = 0;
+    public $lastError = '';
+
     /**
      * Optional config (used by the tests to point the client at a fake ExHentai server):
      *   "exhentai": {"baseUrl": "https://exhentai.org", "throttle": 3}
@@ -94,7 +98,8 @@ class ExClient
         $ch = curl_init($this->url($url));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_FAILONERROR, true);
+        // No CURLOPT_FAILONERROR: ExHentai sends its "gallery not available" pages (copyright claim, removed)
+        // with HTTP 404, and the callers need that page to tell why. A failed connection still returns false.
         curl_setopt($ch, CURLOPT_MAXREDIRS, 300);
 
         $cookie = Config::buildCookie();
@@ -102,6 +107,8 @@ class ExClient
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
         
         $ret = curl_exec($ch);
+        $this->lastStatus = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $this->lastError = $ret === false ? curl_error($ch) : '';
         
         if (strpos($ret, 'Your IP address has been temporarily banned for using automated mirroring/harvesting software and/or failing to heed the overload warning.') !== false) {
             printf("Banned. Waiting a minute before retrying.\n");

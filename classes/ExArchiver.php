@@ -161,7 +161,8 @@ class ExArchiver
 
         $galleryHtml = $this->client->gallery($gallery->exhenid, $gallery->hash);
         if (!$galleryHtml) {
-            Log::error(self::LOG_TAG, 'Failed to retrieve page from server');
+            Log::error(self::LOG_TAG, 'Failed to retrieve page from server: %s',
+                $this->client->lastError ?: 'HTTP '.$this->client->lastStatus);
             return;
         }
 

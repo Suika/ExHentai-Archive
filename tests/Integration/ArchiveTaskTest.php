@@ -159,7 +159,7 @@ final class ArchiveTaskTest extends TestCase
     public function testCopyrightClaimUnqueuesTheGallery(): void
     {
         Fixtures::requireAll('gallery-copyright.html');
-        Stack::fake()->gallery(self::GID, 'gallery-copyright.html');
+        Stack::fake()->gallery(self::GID, 'gallery-copyright.html', array('status' => 404)); // as ExHentai sends it
         Api::data('addgallery', array('gid' => self::GID, 'token' => self::TOKEN));
 
         $result = $this->archive();
@@ -239,7 +239,8 @@ final class ArchiveTaskTest extends TestCase
 
         $result = $this->archive();
 
-        $this->assertStringContainsString('Failed to retrieve page from server', $result['output']);
+        // HTTP 404 "Key missing, or incorrect key provided." (the page body is read, not dropped)
+        $this->assertStringContainsString('Gallery #999: ExHentai returned no gallery page', $result['output']);
         $this->assertSame(array('0', '0'), array_map('strval',
             array_values(array_intersect_key(Db::galleryByExhenid(999), array_flip(array('archived', 'hasmeta'))))));
     }

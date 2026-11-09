@@ -105,7 +105,7 @@ final class AuditTaskTest extends TestCase
     {
         $tags = $this->tags();
         Fixtures::requireAll('gallery-removed.html');
-        Stack::fake()->gallery(self::GID, 'gallery-removed.html');
+        Stack::fake()->gallery(self::GID, 'gallery-removed.html', array('status' => 404)); // as ExHentai sends it
 
         $output = $this->runTask('Audit');
 
