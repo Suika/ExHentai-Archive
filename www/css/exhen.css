@@ -521,6 +521,10 @@ header {
     display: block;
 }
 
+.gallery-info .info-handle {
+    display: none;
+}
+
 .gallery-info .origtitle {
     color: #aaa;
     font-size: 12px;
@@ -943,9 +947,33 @@ input[type="checkbox"].viewtype:checked + div > div {
         left: 0;
         right: 0;
         max-width: none;
-        padding: 8px 10px 4px;
-        background: rgba(0, 0, 0, 0.6);
+        max-height: 60%;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 8px 10px 0;
+        background: rgba(0, 0, 0, 0.75);
         z-index: 50;
+    }
+    /* grab handle at the bottom of the panel: tap or swipe up to close */
+    html.reader-ui .gallery-info .info-handle {
+        display: block;
+        position: sticky;
+        bottom: 0;
+        height: 28px;
+        margin: 0 -10px;
+        background: rgba(0, 0, 0, 0.85);
+        cursor: pointer;
+    }
+    html.reader-ui .gallery-info .info-handle::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 11px;
+        width: 48px;
+        height: 5px;
+        margin-left: -24px;
+        border-radius: 3px;
+        background: #aaa;
     }
     html.reader-ui .gallery-info .title,
     html.reader-ui .gallery-info .origtitle {

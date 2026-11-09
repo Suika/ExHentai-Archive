@@ -1333,7 +1333,9 @@ $(document).ready(function() {
 		var swipeStart = null;
 		container.on('touchstart', function(e) {
 			var touches = e.originalEvent.touches;
-			swipeStart = (!mode && touches.length === 1) ? { x: touches[0].clientX, y: touches[0].clientY } : null;
+			// not on the controls: swiping over the tag panel or the thumbnail strip doesn't turn pages
+			var onControls = $(e.target).closest('.gallery-info, .gallery-actions, .gallery-thumbs-outer').length > 0;
+			swipeStart = (!mode && !onControls && touches.length === 1) ? { x: touches[0].clientX, y: touches[0].clientY } : null;
 		});
 		container.on('touchend', function(e) {
 			var touch = e.originalEvent.changedTouches[0];
@@ -1348,6 +1350,34 @@ $(document).ready(function() {
 			if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
 				loadImage(currentIndex + (dx < 0 ? 1 : -1), true, false, false, true);
 			}
+		});
+
+		// The title/tag panel scrolls when there are many tags. It closes with a tap on its handle, a swipe up
+		// on the handle, or a swipe up once its end is reached (like a phone's notification shade).
+		infoContainer.on('click', '.info-handle', function() {
+			$('html').removeClass('reader-ui');
+		});
+		var panelSwipe = null;
+		infoContainer.on('touchstart', function(e) {
+			var touches = e.originalEvent.touches;
+			var panel = infoContainer[0];
+			panelSwipe = touches.length !== 1 ? null : {
+				x: touches[0].clientX,
+				y: touches[0].clientY,
+				onHandle: $(e.target).closest('.info-handle').length > 0,
+				atEnd: panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 2
+			};
+		});
+		infoContainer.on('touchend', function(e) {
+			var touch = e.originalEvent.changedTouches[0];
+			if(panelSwipe && touch) {
+				var dx = touch.clientX - panelSwipe.x;
+				var dy = touch.clientY - panelSwipe.y;
+				if(dy < -50 && Math.abs(dy) > Math.abs(dx) && (panelSwipe.onHandle || panelSwipe.atEnd)) {
+					$('html').removeClass('reader-ui');
+				}
+			}
+			panelSwipe = null;
 		});
 
 		thumbsList.on('click', '.gallery-thumb', function() {

@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\Browser;
 use Tests\Support\BrowserSeed;
 use Tests\Support\Stack;
+use Tests\Support\ZipFactory;
 
 /**
  * The reader: single page (spv) and multi page (mpv), desktop and phone.
@@ -13,10 +14,17 @@ use Tests\Support\Stack;
 final class ReaderTest extends TestCase
 {
     private static int $gallery;
+    private static int $manyTags;
 
     public static function setUpBeforeClass(): void
     {
         self::$gallery = BrowserSeed::create(0);
+
+        $tags = array();
+        for ($i = 1; $i <= 80; $i++) {
+            $tags[] = sprintf('female:long tag name %02d', $i);
+        }
+        self::$manyTags = Stack::seedManualGallery('Many Tags Gallery', ZipFactory::standardEntries(), $tags);
     }
 
     private function openSpv(Browser $b, int $index = 0): Browser
@@ -144,6 +152,55 @@ final class ReaderTest extends TestCase
         $b->tap(195, 420);
         $b->waitFor('!$(".gallery-info .tags").is(":visible")', 3000, 'a second tap hides them');
         $this->assertSame('1/5', $b->js('$(".page-count").text()'), 'middle taps do not turn pages');
+        $b->close();
+    }
+
+    public function testPhoneManyTagsScrollAndClose(): void
+    {
+        $b = Browser::phone();
+        $b->open('/?action=gallery&id='.self::$manyTags.'&index=0', array('viewType' => 'spv'));
+        $b->waitFor('$(".image-holder").prop("naturalWidth") > 0');
+
+        $b->tap(195, 420);
+        $b->waitFor('$(".gallery-info .tag").length === 80 && $(".gallery-info .tags").is(":visible")');
+
+        $panel = '$(".gallery-info")[0]';
+        $this->assertLessThan(844 * 0.7, $b->js($panel.'.getBoundingClientRect().bottom'), 'the panel leaves room below');
+        $this->assertGreaterThan($b->js($panel.'.clientHeight'), $b->js($panel.'.scrollHeight'), 'and scrolls');
+        $handle = $b->js('(function(r){ return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]; })'
+            .'($(".gallery-info .info-handle")[0].getBoundingClientRect())');
+
+        // a horizontal swipe over the tags doesn't turn the page
+        $b->swipe(330, 200, 60, 205);
+        usleep(400000);
+        $this->assertSame('1/5', $b->js('$(".page-count").text()'));
+
+        // tap below the panel closes it
+        $b->tap(195, 780);
+        $b->waitFor('!$("html").hasClass("reader-ui")', 3000, 'tap below the panel closes it');
+
+        // tap on the handle closes it
+        $b->tap(195, 420);
+        $b->waitFor('$("html").hasClass("reader-ui")');
+        $b->tap($handle[0], $handle[1]);
+        $b->waitFor('!$("html").hasClass("reader-ui")', 3000, 'tap on the handle closes it');
+
+        // swipe up on the handle closes it
+        $b->tap(195, 420);
+        $b->waitFor('$("html").hasClass("reader-ui")');
+        $b->swipe($handle[0], $handle[1], $handle[0], $handle[1] - 200);
+        $b->waitFor('!$("html").hasClass("reader-ui")', 3000, 'swipe up on the handle closes it');
+
+        // swipe up at the end of the scrolled panel closes it
+        $b->tap(195, 420);
+        $b->waitFor('$("html").hasClass("reader-ui")');
+        $b->js($panel.'.scrollTop = '.$panel.'.scrollHeight');
+        usleep(200000);
+        $b->swipe(195, 300, 195, 100);
+        $b->waitFor('!$("html").hasClass("reader-ui")', 3000, 'swipe up at the end closes it');
+
+        $this->assertSame('1/5', $b->js('$(".page-count").text()'), 'no page was turned');
+        $this->assertSame(array(), $b->errors());
         $b->close();
     }
 
