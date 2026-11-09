@@ -7,25 +7,48 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * import-mysql-dump.php: a MariaDB dump (mysqldump format) into a new SQLite database, with search index.
+ * export-mysql-dump.php: the way back, SQLite into a MariaDB dump.
  */
 final class MigrationTest extends TestCase
 {
     private const TARGET = APP_ROOT.'/tmp/migration-test.sqlite';
+    private const EXPORT = APP_ROOT.'/tmp/migration-test-export.sql';
+    private const ROUNDTRIP = APP_ROOT.'/tmp/migration-test-roundtrip.sqlite';
 
     protected function setUp(): void
     {
-        foreach (glob(self::TARGET.'*') as $file) {
+        foreach (array_merge(glob(self::TARGET.'*'), glob(self::ROUNDTRIP.'*'), glob(self::EXPORT)) as $file) {
             unlink($file);
         }
     }
 
-    private static function import(): array
+    private static function php(string $script, string ...$args): array
     {
-        $cmd = sprintf('cd %s && php import-mysql-dump.php tests/fixtures/mysql/dump.sql %s 2>&1',
-            escapeshellarg(APP_ROOT), escapeshellarg(self::TARGET));
-        exec($cmd, $out, $ret);
+        $cmd = 'cd '.escapeshellarg(APP_ROOT).' && php '.$script;
+        foreach ($args as $arg) {
+            $cmd .= ' '.escapeshellarg($arg);
+        }
+        exec($cmd.' 2>&1', $out, $ret);
 
         return array($ret, implode("\n", $out));
+    }
+
+    private static function import(string $dump = 'tests/fixtures/mysql/dump.sql', string $target = self::TARGET): array
+    {
+        return self::php('import-mysql-dump.php', $dump, $target);
+    }
+
+    /** all rows of all tables and the next ids */
+    private static function contents(string $file): array
+    {
+        $db = new PDO('sqlite:'.$file, null, null, array(PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC));
+        $data = array();
+        foreach (array('feed', 'gallery', 'tag', 'tagnamespace', 'gallery_tag', 'image', 'gallery_thumb', 'galleryproperty', 'sqlite_sequence') as $table) {
+            $data[$table] = $db->query("select * from $table order by 1")->fetchAll();
+        }
+        $data['search'] = $db->query("select rowid from gallery_fts where gallery_fts match '\"female:big breasts\" AND \"東 方\"'")->fetchAll();
+
+        return $data;
     }
 
     public function testImport(): void
@@ -56,6 +79,26 @@ final class MigrationTest extends TestCase
         $this->assertSame(array(10), $search('"female:big breasts"'));
         $this->assertSame(array(10), $search('"東 方"'));
         $this->assertSame(array(12), $search('"line"'));
+    }
+
+    public function testExportImportsBackUnchanged(): void
+    {
+        $this->assertSame(0, self::import()[0]);
+
+        list($ret, $output) = self::php('export-mysql-dump.php', self::EXPORT, self::TARGET);
+        $this->assertSame(0, $ret, $output);
+        $this->assertMatchesRegularExpression('/gallery\s+2 rows/', $output);
+
+        $dump = file_get_contents(self::EXPORT);
+        $this->assertStringContainsString("'[Circle] It\\'s a \\\"Test\\\" Book\\\\Part (C99) [English]'", $dump, 'mysqldump escapes');
+        $this->assertStringContainsString("'Line\\nBreak and\ttab'", $dump);
+        $this->assertStringContainsString('ENGINE=InnoDB AUTO_INCREMENT=50 ', $dump, 'next gallery id');
+        $this->assertStringContainsString('CREATE TABLE `sph_counter`', $dump, 'the former schema, for Manticore');
+
+        list($ret, $output) = self::import('tmp/'.basename(self::EXPORT), self::ROUNDTRIP);
+        $this->assertSame(0, $ret, $output);
+        $this->assertSame(self::contents(self::TARGET), self::contents(self::ROUNDTRIP));
+        $this->assertNotEmpty(self::contents(self::ROUNDTRIP)['search']);
     }
 
     public function testRefusesADatabaseWithGalleries(): void

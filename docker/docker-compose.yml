@@ -2,6 +2,9 @@
 # Migrating from MariaDB: dump it (mysqldump exhen > dump.sql), put the dump into ./exhen/data and,
 # before the first start, run
 #   docker compose run --rm exhen php import-mysql-dump.php data/dump.sql
+# Back to MariaDB (the master branch version): stop the app, then
+#   docker compose run --rm exhen php export-mysql-dump.php data/dump.sql
+#   mysql -u exhen -p exhen < ./exhen/data/dump.sql
 services:
   exhen:
     image: suika/exhentai-archive:latest

@@ -30,7 +30,8 @@ SHOW_STACK_LOG=1 docker compose -f docker-compose.test.yml run --rm tests    # p
 docker compose -f docker-compose.test.yml down -v                    # remove the containers
 ```
 
-`classes/`, `www/`, `TaskRunner.php`, `common.php`, `import-mysql-dump.php`, `db.sql` and `tests/` are mounted into the container,
+`classes/`, `www/`, `TaskRunner.php`, `common.php`, `import-mysql-dump.php`, `export-mysql-dump.php`, `db.sql` and
+`tests/` are mounted into the container,
 so code and test changes don't need a rebuild.
 
 Every integration test class starts from an empty database (`db.sql`), archive, images, cache and search

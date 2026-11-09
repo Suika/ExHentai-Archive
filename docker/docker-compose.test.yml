@@ -41,6 +41,7 @@ services:
       - ../common.php:/var/www/exhen/common.php:ro
       - ../TaskRunner.php:/var/www/exhen/TaskRunner.php:ro
       - ../import-mysql-dump.php:/var/www/exhen/import-mysql-dump.php:ro
+      - ../export-mysql-dump.php:/var/www/exhen/export-mysql-dump.php:ro
       - ../db.sql:/var/www/exhen/db.sql:ro
       - ../phpunit.xml.dist:/var/www/exhen/phpunit.xml.dist:ro
       - ../tests:/var/www/exhen/tests

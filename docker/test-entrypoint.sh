@@ -14,7 +14,8 @@ sed -i 's|"base": {|"base": {\n        "exhentai": {"baseUrl": "'"${FAKE_EXHENTA
 sh /entrypoint.sh > /var/log/exhen-stack.log 2>&1 &
 
 mkdir -p "$FAKE_EXHENTAI_STATE"
-php -S "${FAKE_EXHENTAI_URL#http://}" tests/fake-exhentai/router.php > /var/log/fake-exhentai.log 2>&1 &
+# several workers: a hanging page (tests with "sleep") must not hold up the next request, as on the real site
+PHP_CLI_SERVER_WORKERS=4 php -S "${FAKE_EXHENTAI_URL#http://}" tests/fake-exhentai/router.php > /var/log/fake-exhentai.log 2>&1 &
 
 echo "Waiting for the app stack"
 i=0
