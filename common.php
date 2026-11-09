@@ -30,9 +30,10 @@ $config = Config::get();
 R::setup($config->db->dsn, $config->db->user ?? null, $config->db->pass ?? null);
 R::freeze(true);
 
-// SQLite: wait for a running write instead of failing right away ("database is locked"), and enforce
-// the foreign keys (ON DELETE SET NULL, as in the former MariaDB schema)
-R::exec('PRAGMA busy_timeout = 10000');
+// SQLite: wait for a running write instead of failing right away ("database is locked"; the longest
+// write is a full rebuild of the search index, about 30 s), and enforce the foreign keys (ON DELETE
+// SET NULL, as in the former MariaDB schema)
+R::exec('PRAGMA busy_timeout = 60000');
 R::exec('PRAGMA foreign_keys = ON');
 
 

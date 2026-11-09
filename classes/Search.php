@@ -46,15 +46,18 @@ class Search
     }
 
     /**
-     * Rebuilds the whole index (migration, api.php?action=indexer). Galleries are read in batches.
+     * Rebuilds the whole index (migration, api.php?action=indexer) in one transaction (prod data: about
+     * 30 s). Searches keep using the old index meanwhile; other writes (tasks, read status) wait for it
+     * (busy_timeout in common.php).
      *
      * @return int indexed galleries
      */
     public static function rebuild()
     {
-        R::begin();
+        // IMMEDIATE: take the write lock first (a transaction that reads first can't wait for it later)
+        R::exec('BEGIN IMMEDIATE');
         try {
-            R::exec("delete from gallery_fts");
+            R::exec('delete from gallery_fts');
 
             $count = 0;
             $lastId = 0;
@@ -84,13 +87,11 @@ class Search
                 $lastId = end($ids);
             }
 
-            R::commit();
+            R::exec('COMMIT');
         } catch (Throwable $e) {
-            R::rollback();
+            R::exec('ROLLBACK');
             throw $e;
         }
-
-        R::exec("insert into gallery_fts (gallery_fts) values ('optimize')");
 
         return $count;
     }
