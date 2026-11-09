@@ -128,6 +128,72 @@ final class AuditTaskTest extends TestCase
         $this->assertNotNull(Db::gallery($this->id)['lastaudit']);
     }
 
+    public function testServerErrorLeavesTheGalleryUnaudited(): void
+    {
+        Stack::fake()->gallery(self::GID, 'gallery-'.self::GID.'.html', array('status' => 503));
+
+        $output = $this->runTask('Audit');
+
+        $this->assertStringContainsString('Request failed (HTTP 503), the gallery is checked again by the next run', $output);
+        $this->assertNull(Db::gallery($this->id)['lastaudit']);
+
+        Stack::fake()->gallery(self::GID, 'gallery-'.self::GID.'.html');
+        $this->runTask('Audit');
+        $this->assertNotNull(Db::gallery($this->id)['lastaudit'], 'checked by the next run');
+    }
+
+    public function testHangingRequestLeavesTheGalleryUnaudited(): void
+    {
+        Stack::fake()->gallery(self::GID, 'gallery-'.self::GID.'.html', array('sleep' => 4)); // requestTimeout is 2 s
+
+        $output = $this->runTask('Audit');
+
+        $this->assertStringContainsString('Request failed (Operation timed out', $output);
+        $this->assertNull(Db::gallery($this->id)['lastaudit']);
+    }
+
+    public function testOutageStopsTheRun(): void
+    {
+        // more galleries due for an audit than the failure limit
+        for ($i = 1; $i <= 7; $i++) {
+            Db::exec("insert into gallery (exhenid, hash, name, archived, download, deleted, source, added, posted, updated)
+                values (?, 'abc', ?, 1, 1, 0, 0, now() - interval 10 day, now() - interval 30 day, now())", array(1000 + $i, "Outage $i"));
+        }
+        Stack::fake()->block('down', 1000);
+        Stack::fake()->clearRequests();
+
+        $start = microtime(true);
+        $output = $this->runTask('Audit');
+
+        $this->assertStringContainsString('ExHentai not reachable (5 failed requests in a row), stopping this run', $output);
+        $this->assertCount(5, Stack::fake()->requests());
+        $this->assertSame(0, Db::count('gallery', 'lastaudit is not null'), 'nothing marked as audited');
+        $this->assertLessThan(30, microtime(true) - $start);
+    }
+
+    public function testBanStopsTheAudit(): void
+    {
+        Stack::fake()->block('ban', 100);
+
+        $output = $this->runTask('Audit');
+
+        $this->assertStringContainsString('IP temporarily banned by ExHentai, expires in 2 hours and 13 minutes: stopped this run', $output);
+        $this->assertNull(Db::gallery($this->id)['lastaudit']);
+    }
+
+    public function testFailedNewerVersionRequestChangesNothing(): void
+    {
+        Fixtures::requireAll('gallery-newer-older.html');
+        $old = $this->archived(4161523, 'ebe6633549', 'gallery-newer-older.html');
+        Stack::fake()->gallery(4313473, 'gallery-'.self::GID.'.html', array('status' => 503));
+
+        $this->runTask('ForceAudit', 'id', (string)$old);
+
+        $row = Db::gallery($old);
+        $this->assertSame(array('0', null), array((string)$row['deleted'], $row['lastaudit']));
+        $this->assertNull(Db::galleryByExhenid(4313473), 'the newer version is not queued');
+    }
+
     public function testMissingGalleryIsMarkedAudited(): void
     {
         Stack::fake()->removeGallery(self::GID); // 404

@@ -16,6 +16,11 @@ final class FakeExhentai
 
     public function reset(): self
     {
+        // the server handles one request at a time: wait until a hanging request of a previous test is done
+        $ch = curl_init((getenv('FAKE_EXHENTAI_URL') ?: 'http://127.0.0.1:8090').'/ping');
+        curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15));
+        curl_exec($ch);
+
         $dir = self::stateDir();
         foreach (glob($dir.'/archives/*') ?: array() as $file) {
             unlink($file);
@@ -24,6 +29,7 @@ final class FakeExhentai
             mkdir($dir.'/archives', 0777, true);
         }
         file_put_contents($dir.'/requests.log', '');
+        @unlink($dir.'/block.json');
 
         $this->state = array('galleries' => array(), 'index' => array(), 'archiver' => 'normal');
         return $this->save();
@@ -43,6 +49,18 @@ final class FakeExhentai
     {
         $this->state['galleries'][(string)$gid] = array('html' => $html, 'status' => $status);
         return $this->save();
+    }
+
+    /**
+     * Answers $count page requests, after $skip normal ones, with the ban page ("ban"), the "too fast"
+     * warning ("warn") or HTTP 503 ("down")
+     */
+    public function block(string $type, int $count, int $skip = 0, string $expires = '2 hours and 13 minutes'): self
+    {
+        // own file: the fake server counts it down
+        file_put_contents(self::stateDir().'/block.json',
+            json_encode(array('type' => $type, 'count' => $count, 'skip' => $skip, 'expires' => $expires)));
+        return $this;
     }
 
     public function removeGallery(int $gid): self

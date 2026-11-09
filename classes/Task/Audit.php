@@ -9,46 +9,79 @@ class Task_Audit extends Task_Abstract {
     /** Whether an audit also refreshes the gallery type (Task_ForceAudit never did) */
     protected $updateType = true;
 
+    /** a run stops after this many failed requests in a row (ExHentai or the network is down) */
+    const MAX_FAILURES_IN_A_ROW = 5;
+
     public function run($options = array()) {
         $this->client = new ExClient();
 
-        while(true) {
+        $interval = isset($options[0]) ? $options[0] : "1 year";
+        $skipped = array();   // galleries whose request failed: not marked, checked again by the next run
+        $failuresInARow = 0;
 
-            $interval = isset($options[0]) ? $options[0] : "1 year";
+        try {
+            while(true) {
+                $sql = 'archived = 1 and deleted = 0 and source = 0 and'.
+                    '((added <= date_sub(date(now()), interval 3 day) and'. // if added more than 3 days ago...
+                    '(posted >= date_sub(date(now()), interval ' . $interval . ') or (lastaudit is null)) and'. // and if the gallery is more than input old but NOT if it's unaudited
+                    '(lastaudit is null or lastaudit <= date_sub(date(now()), interval 7 day))) or'. // ...and not yet audited, or audited more than 7 days ago
+                    '((added >= date_sub(date(now()), interval 7 day) and added <= date_sub(date(now()), interval 1 day)) and'. // OR, added less than 7 days ago (but more than 24 hours ago)...
+                    '(lastaudit is null or lastaudit <= date_sub(date(now()), interval 1 day))))'; // ...and not yet audited, or audited more than 1 day ago
+                if ($skipped) {
+                    $sql = '('.$sql.') and id not in ('.R::genSlots($skipped).')';
+                }
 
-            $galleries = R::find('gallery',
-                'archived = 1 and deleted = 0 and source = 0 and'.
-                '((added <= date_sub(date(now()), interval 3 day) and'. // if added more than 3 days ago...
-                '(posted >= date_sub(date(now()), interval ' . $interval . ') or (lastaudit is null)) and'. // and if the gallery is more than input old but NOT if it's unaudited
-                '(lastaudit is null or lastaudit <= date_sub(date(now()), interval 7 day))) or'. // ...and not yet audited, or audited more than 7 days ago
-				'((added >= date_sub(date(now()), interval 7 day) and added <= date_sub(date(now()), interval 1 day)) and'. // OR, added less than 7 days ago (but more than 24 hours ago)...
-                '(lastaudit is null or lastaudit <= date_sub(date(now()), interval 1 day))))'. // ...and not yet audited, or audited more than 1 day ago
-                'order by posted desc limit 100');
+                $galleries = R::find('gallery', $sql.' order by posted desc limit 100', $skipped);
 
-            if(count($galleries) === 0) {
-                break;
+                if(count($galleries) === 0) {
+                    break;
+                }
+
+                foreach($galleries as $gallery) {
+                    if ($this->audit($gallery)) {
+                        $failuresInARow = 0;
+                        continue;
+                    }
+
+                    $skipped[] = $gallery->id;
+                    if (++$failuresInARow >= self::MAX_FAILURES_IN_A_ROW) {
+                        Log::error(static::LOG_TAG, 'ExHentai not reachable (%d failed requests in a row), stopping this run', $failuresInARow);
+                        break 2;
+                    }
+                }
             }
-
-            foreach($galleries as $gallery) {
-                $this->audit($gallery);
-            }
+        } catch (ExClient_BannedException $e) {
+            // retrying would only extend the ban: stop this run, the next one continues
+            Log::error(static::LOG_TAG, '%s: stopped this run', $e->getMessage());
         }
 
         Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
     }
 
+    /**
+     * True when ExHentai answered, also with an error page (HTTP 404: removed gallery or copyright claim).
+     * False when there was no answer (connection failure, timeout) or a server error (HTTP 5xx).
+     */
+    protected function answered($html) {
+        if (is_string($html) && $html !== '' && $this->client->lastStatus < 500) {
+            return true;
+        }
+
+        Log::error(static::LOG_TAG, 'Request failed (%s), the gallery is checked again by the next run',
+            $this->client->lastError ?: 'HTTP '.$this->client->lastStatus);
+        return false;
+    }
+
+    /**
+     * @return bool false when ExHentai could not be asked (the gallery is left unchanged, not marked as audited)
+     * @throws ExClient_BannedException
+     */
     protected function audit($gallery) {
         Log::debug(static::LOG_TAG, 'Auditing gallery: #%d - %s', $gallery->exhenid, $gallery->name);
 
         $galleryHtml = $this->client->gallery($gallery->exhenid, $gallery->hash);
-
-        // Galleries that are removed now return a 404, so we have to leave them as audited completely for now.
-        if(!$galleryHtml) {
-            $gallery->lastaudit = date('Y-m-d H:i:s'); //gallery was probably deleted, so mark it as audited for now
-            R::store($gallery);
-
-            Log::error(static::LOG_TAG, 'Gallery was either removed or was invalid.');
-            return;
+        if (!$this->answered($galleryHtml)) {
+            return false;
         }
 
         $galleryPage = new ExPage_Gallery($galleryHtml);
@@ -62,13 +95,16 @@ class Task_Audit extends Task_Abstract {
             } else {
                 Log::error(static::LOG_TAG, 'Gallery was either removed or was invalid.');
             }
-            return;
+            return true;
         }
 
         $childGallery = $galleryPage->getNewestVersion();
         if($childGallery) {
 
             $childHtml = $this->client->gallery($childGallery->exhenid, $childGallery->hash);
+            if (!$this->answered($childHtml)) {
+                return false; // neither marked as replaced nor as audited
+            }
             $childPage = new ExPage_Gallery($childHtml);
 
             if ($childPage->isValid()) {
@@ -117,6 +153,8 @@ class Task_Audit extends Task_Abstract {
         }
 
         R::store($gallery);
+
+        return true;
     }
 
     static function tagsDiff($tags1, $tags2){

@@ -10,11 +10,19 @@ class ExClient
     public $lastStatus = 0;
     public $lastError = '';
 
+    const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
+
     /**
-     * Optional config (used by the tests to point the client at a fake ExHentai server):
-     *   "exhentai": {"baseUrl": "https://exhentai.org", "throttle": 3}
-     * baseUrl replaces the https://exhentai.org prefix of every request URL (also of links taken from pages,
-     * like the archiver link); throttle is the pause in seconds after every 5 requests (0 disables it).
+     * Optional config, "exhentai" section (defaults in brackets):
+     *   baseUrl           replaces the https://exhentai.org prefix of every request URL, also of links taken
+     *                     from pages like the archiver link (tests point it at a fake ExHentai server)
+     *   throttle          pause in seconds after every 5 requests, 0 disables it [3]
+     *   connectTimeout    seconds to connect [30]
+     *   requestTimeout    seconds for a whole page request [120]
+     *   warnWait          seconds to wait after "You are opening pages too fast" [60]
+     *   warnRetries       retries after that warning before giving up like on a ban [3]
+     *   downloadTimeout   archive download: seconds without data before giving up [120] (ExArchiver)
+     *   userAgent         [a current desktop Chrome]
      */
     protected static function setting($name, $default)
     {
@@ -34,6 +42,37 @@ class ExClient
         }
 
         return $url;
+    }
+
+    protected static function userAgent()
+    {
+        return (string)self::setting('userAgent', self::USER_AGENT);
+    }
+
+    /**
+     * Throws when the response is ExHentai's ban page.
+     *
+     * @throws ExClient_BannedException
+     */
+    protected static function checkBan($response)
+    {
+        if (is_string($response) && stripos($response, 'Your IP address has been temporarily banned') !== false) {
+            $expires = self::banExpiry($response);
+            throw new ExClient_BannedException('IP temporarily banned by ExHentai'.($expires ? ', expires in '.$expires : ''));
+        }
+    }
+
+    /**
+     * @return string|null e.g. "2 hours and 13 minutes" from "The ban expires in 2 hours and 13 minutes"
+     */
+    public static function banExpiry($response)
+    {
+        $text = preg_replace('/\s+/', ' ', strip_tags((string)$response));
+        if (preg_match('/ban expires in ((?:\d+ (?:days?|hours?|minutes?|seconds?)(?:,? and |, | )?)+)/i', $text, $matches)) {
+            return trim(preg_replace('/(,? and |, )$/', '', trim($matches[1])));
+        }
+
+        return null;
     }
 
     protected function throttle()
@@ -79,9 +118,15 @@ class ExClient
         return $this->exec($url);
     }
 
-    public function tagSearch($search = '', $page = 0)
+    /**
+     * Galleries with a tag, e.g. "female:glasses". $next is the page cursor like for index().
+     */
+    public function tagSearch($search = '', $next = null)
     {
-        $url = sprinf("%s/tag/%s/%d", self::BASE_URL, $search, $page);
+        $url = sprintf('%s/tag/%s', self::BASE_URL, rawurlencode($search));
+        if ($next !== null && $next !== '') {
+            $url .= '?'.http_build_query(array('next' => $next));
+        }
         return $this->exec($url);
     }
 
@@ -91,38 +136,50 @@ class ExClient
         return $this->exec($url);
     }
 
+    /**
+     * GET request with the account cookies. Returns the page (also for HTTP errors like the 404 "gallery not
+     * available" pages, see $lastStatus) or false when the request failed (see $lastError).
+     *
+     * @throws ExClient_BannedException when banned, or still warned about opening pages too fast after the retries
+     */
     public function exec($url)
     {
-        $this->throttle();
+        $retries = (int)self::setting('warnRetries', 3);
 
-        $ch = curl_init($this->url($url));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        // No CURLOPT_FAILONERROR: ExHentai sends its "gallery not available" pages (copyright claim, removed)
-        // with HTTP 404, and the callers need that page to tell why. A failed connection still returns false.
-        curl_setopt($ch, CURLOPT_MAXREDIRS, 300);
+        for ($attempt = 0; ; $attempt++) {
+            $this->throttle();
 
-        $cookie = Config::buildCookie();
-        curl_setopt($ch, CURLOPT_COOKIE, $cookie);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
-        
-        $ret = curl_exec($ch);
-        $this->lastStatus = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $this->lastError = $ret === false ? curl_error($ch) : '';
-        
-        if (strpos($ret, 'Your IP address has been temporarily banned for using automated mirroring/harvesting software and/or failing to heed the overload warning.') !== false) {
-            printf("Banned. Waiting a minute before retrying.\n");
-            sleep(60*60);
-            return $this->exec($url);
+            $ch = curl_init($this->url($url));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            // No CURLOPT_FAILONERROR: ExHentai sends its "gallery not available" pages (copyright claim, removed)
+            // with HTTP 404, and the callers need that page to tell why. A failed connection still returns false.
+            curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, (int)self::setting('connectTimeout', 30));
+            curl_setopt($ch, CURLOPT_TIMEOUT, (int)self::setting('requestTimeout', 120));
+            curl_setopt($ch, CURLOPT_COOKIE, Config::buildCookie());
+            curl_setopt($ch, CURLOPT_USERAGENT, self::userAgent());
+
+            $ret = curl_exec($ch);
+            $this->lastStatus = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $this->lastError = $ret === false ? curl_error($ch) : '';
+
+            self::checkBan($ret);
+
+            if (!is_string($ret) || strpos($ret, 'You are opening pages too fast') === false) {
+                return $ret;
+            }
+
+            if ($attempt >= $retries) {
+                throw new ExClient_BannedException(sprintf('still warned for opening pages too fast after %d retries', $retries));
+            }
+
+            $wait = (int)self::setting('warnWait', 60);
+            Log::error('ExClient', 'Warned for opening pages too fast, waiting %d s (%d/%d)', $wait, $attempt + 1, $retries);
+            if ($wait > 0) {
+                sleep($wait);
+            }
         }
-
-        if (strpos($ret, 'You are opening pages too fast') !== false) {
-            printf("Warned. Waiting 10 seconds before retying.\n");
-            sleep(60*10);
-            return $this->exec($url);
-        }
-
-        return $ret;
     }
     
     public function buttonPress($url)
@@ -137,13 +194,20 @@ class ExClient
             curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post));
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
             curl_setopt($ch, CURLOPT_FAILONERROR, true);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, (int)self::setting('connectTimeout', 30));
+            curl_setopt($ch, CURLOPT_TIMEOUT, (int)self::setting('requestTimeout', 120));
 
             $cookie = Config::buildCookie();
             curl_setopt($ch, CURLOPT_COOKIE, $cookie);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
+            curl_setopt($ch, CURLOPT_USERAGENT, self::userAgent());
             
             $ret = curl_exec($ch);
+            $this->lastStatus = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $this->lastError = $ret === false ? curl_error($ch) : '';
+
+            self::checkBan($ret);
             
             return $ret;
         } else {
@@ -163,7 +227,7 @@ class ExClient
         
         $cookie = Config::buildCookie();
         curl_setopt($ch, CURLOPT_COOKIE, $cookie);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
+        curl_setopt($ch, CURLOPT_USERAGENT, self::userAgent());
             
         $ret = curl_exec($ch);
     }
@@ -179,7 +243,7 @@ class ExClient
         
         $cookie = Config::buildCookie();
         curl_setopt($ch, CURLOPT_COOKIE, $cookie);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
+        curl_setopt($ch, CURLOPT_USERAGENT, self::userAgent());
         
         $ret = curl_exec($ch);
         

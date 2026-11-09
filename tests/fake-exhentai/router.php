@@ -18,6 +18,9 @@
  * The archiver pages use tests/fixtures/exhentai/archiver-form.html / archiver-continue.html when they exist,
  * otherwise a minimal page with the same elements the app looks for.
  *
+ * $FAKE_EXHENTAI_STATE/block.json ({type: ban|warn|down, count: N, skip: M, expires: text}) answers N page requests
+ * (after M normal ones) with ExHentai's ban page, the "opening pages too fast" page or HTTP 503; a gallery's "sleep" makes its page hang for that many seconds.
+ *
  * Every request is appended to $FAKE_EXHENTAI_STATE/requests.log (one JSON object per line).
  */
 
@@ -39,6 +42,7 @@ file_put_contents($stateDir.'/requests.log', json_encode(array(
     'uri' => $uri,
     'post' => $_POST,
     'cookie' => $_SERVER['HTTP_COOKIE'] ?? '',
+    'agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
 )).PHP_EOL, FILE_APPEND | LOCK_EX);
 
 function fixture($name)
@@ -57,11 +61,39 @@ function send($body, $status = 200, $type = 'text/html; charset=UTF-8')
     exit;
 }
 
+// ban / "too fast" / outage pages instead of the next N page requests, after "skip" normal ones
+// (block.json: type ban|warn|down, count, skip, expires)
+$block = is_file($stateDir.'/block.json') ? json_decode(file_get_contents($stateDir.'/block.json'), true) : null;
+$pageRequest = preg_match('~^/g/~', $path) || $path === '/' || $path === '/archiver.php';
+if ($pageRequest && !empty($block['count'])) {
+    if (!empty($block['skip'])) {
+        $block['skip']--;
+        file_put_contents($stateDir.'/block.json', json_encode($block), LOCK_EX);
+    } else {
+        $block['count']--;
+        file_put_contents($stateDir.'/block.json', json_encode($block), LOCK_EX);
+
+        if ($block['type'] === 'down') {
+            send('<html><body><h1>503 Service Unavailable</h1></body></html>', 503);
+        }
+        if ($block['type'] === 'ban') {
+            send('Your IP address has been temporarily banned for excessive pageloads which indicates that you are using '
+                .'automated mirroring/harvesting software. The ban expires in '.($block['expires'] ?? '59 minutes and 48 seconds'));
+        }
+        send('<html><body>You are opening pages too fast, thus placing a heavy load on the server. Back down, or your IP '
+            .'address will be automatically banned.</body></html>');
+    }
+}
+
 // gallery page
 if (preg_match('~^/g/(\d+)/(\w+)/?$~', $path, $m)) {
     $gallery = $state['galleries'][$m[1]] ?? null;
     if (!$gallery) {
         send('Key missing, or incorrect key provided.', 404);
+    }
+
+    if (!empty($gallery['sleep'])) {
+        sleep((int)$gallery['sleep']); // a hanging request
     }
 
     $html = isset($gallery['html']) ? $gallery['html'] : fixture($gallery['fixture']);

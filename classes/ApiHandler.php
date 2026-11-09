@@ -254,11 +254,11 @@ class ApiHandler
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_FAILONERROR, true);
-                    curl_setopt($ch, CURLOPT_MAXREDIRS, 300);
+                    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
 
                     $cookie = Config::buildCookie();
                     curl_setopt($ch, CURLOPT_COOKIE, $cookie);
-                    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36');
+                    curl_setopt($ch, CURLOPT_USERAGENT, ExClient::USER_AGENT);
                     
                     $ret = curl_exec($ch);
                     

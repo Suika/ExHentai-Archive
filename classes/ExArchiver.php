@@ -37,109 +37,115 @@ class ExArchiver
     {
         $archivedCount = 0;
 
-        //archive unarchived galleries
-        $unarchived = R::find('gallery', '((archived = 0 and download = 1) or hasmeta = 0) and deleted = 0 and source = 0 ORDER BY exhenid DESC');
-        foreach ($unarchived as $gallery) {
-            if ($this->outOfCredits) {
-                break;
-            }
-
-            $this->archiveGallery($gallery);
-
-            if ($gallery->archived) {
-                $archivedCount++;
-            }
-        }
-
-        //run through feeds and add new galleries
-        if ($this->outOfCredits) {
-            $feeds = array(); // stop this run; the galleries are tried again next time
-        } elseif ($forced_feed == false) {
-            $feeds = R::find('feed', 'disabled = 0');
-        } else {
-            $feeds = R::find('feed', 'disabled = 0 and id = :id', [':id' => $forced_feed]);
-        }
-
-        foreach ($feeds as $feed) {
-            if ($this->outOfCredits) {
-                break;
-            }
-            $page = 0;
-            $next = null;      // ExHentai pages search results with a cursor (?next=<gid>)
-            $seen = array();
-
-            while (true) {
-                Log::debug(self::LOG_TAG, 'Crawling feed "%s", page %d', $feed->term, $page);
-
-                $params = array();
-
-                if ($feed->expunged) {
-                    $params['f_sh'] = 'on';
+        try {
+            //archive unarchived galleries
+            $unarchived = R::find('gallery', '((archived = 0 and download = 1) or hasmeta = 0) and deleted = 0 and source = 0 ORDER BY exhenid DESC');
+            foreach ($unarchived as $gallery) {
+                if ($this->outOfCredits) {
+                    break;
                 }
 
-                $indexHtml = $this->client->index($feed->term, $next, $params);
-                $indexPage = new ExPage_Index($indexHtml);
+                $this->archiveGallery($gallery);
 
-                $isLastPage = $indexPage->isLastPage();
-                $hasGallery = false;
+                if ($gallery->archived) {
+                    $archivedCount++;
+                }
+            }
 
-                $galleries = $indexPage->getGalleries();
-                if (count($galleries) == 0) {
+            //run through feeds and add new galleries
+            if ($this->outOfCredits) {
+                $feeds = array(); // stop this run; the galleries are tried again next time
+            } elseif ($forced_feed == false) {
+                $feeds = R::find('feed', 'disabled = 0');
+            } else {
+                $feeds = R::find('feed', 'disabled = 0 and id = :id', [':id' => $forced_feed]);
+            }
+
+            foreach ($feeds as $feed) {
+                if ($this->outOfCredits) {
                     break;
-                } else {
-                    foreach ($galleries as $exGallery) {
-                        $gallery = R::findOne('gallery', 'exhenid = ?', array($exGallery->exhenid));
-                        if (!$gallery) {
-                            $gallery = R::dispense('gallery');
-                            $gallery->exhenid = $exGallery->exhenid;
-                            $gallery->hash = $exGallery->hash;
-                            $gallery->name = $exGallery->name;
-                            $gallery->archived = false;
-                            $gallery->feed = $feed;
-                            $gallery->download = $feed->download;
-                            R::store($gallery);
-                        } else {
-                            if ($gallery->feed_id == $feed->id && $feed->archived) { // compare ids: two loaded beans are never ==
-                                $hasGallery = true;
-                            }
+                }
+                $page = 0;
+                $next = null;      // ExHentai pages search results with a cursor (?next=<gid>)
+                $seen = array();
 
-                            if ($feed->download && $gallery->deleted == 0) {
-                                $gallery->download = true;
+                while (true) {
+                    Log::debug(self::LOG_TAG, 'Crawling feed "%s", page %d', $feed->term, $page);
+
+                    $params = array();
+
+                    if ($feed->expunged) {
+                        $params['f_sh'] = 'on';
+                    }
+
+                    $indexHtml = $this->client->index($feed->term, $next, $params);
+                    $indexPage = new ExPage_Index($indexHtml);
+
+                    $isLastPage = $indexPage->isLastPage();
+                    $hasGallery = false;
+
+                    $galleries = $indexPage->getGalleries();
+                    if (count($galleries) == 0) {
+                        break;
+                    } else {
+                        foreach ($galleries as $exGallery) {
+                            $gallery = R::findOne('gallery', 'exhenid = ?', array($exGallery->exhenid));
+                            if (!$gallery) {
+                                $gallery = R::dispense('gallery');
+                                $gallery->exhenid = $exGallery->exhenid;
+                                $gallery->hash = $exGallery->hash;
+                                $gallery->name = $exGallery->name;
+                                $gallery->archived = false;
+                                $gallery->feed = $feed;
+                                $gallery->download = $feed->download;
                                 R::store($gallery);
+                            } else {
+                                if ($gallery->feed_id == $feed->id && $feed->archived) { // compare ids: two loaded beans are never ==
+                                    $hasGallery = true;
+                                }
+
+                                if ($feed->download && $gallery->deleted == 0) {
+                                    $gallery->download = true;
+                                    R::store($gallery);
+                                }
                             }
-                        }
 
-                        if ($this->outOfCredits) {
-                            break;
-                        }
+                            if ($this->outOfCredits) {
+                                break;
+                            }
 
-                        if ((!$gallery->archived && $gallery->download) || !$gallery->hasmeta) {
-                            $this->archiveGallery($gallery);
+                            if ((!$gallery->archived && $gallery->download) || !$gallery->hasmeta) {
+                                $this->archiveGallery($gallery);
 
-                            if ($gallery->archived) {
-                                $archivedCount++;
+                                if ($gallery->archived) {
+                                    $archivedCount++;
+                                }
                             }
                         }
                     }
-                }
 
-                if ($isLastPage) {
-                    $feed->archived = true;
-                    R::store($feed);
-                }
+                    if ($isLastPage) {
+                        $feed->archived = true;
+                        R::store($feed);
+                    }
 
-                if ($isLastPage || $hasGallery || $this->outOfCredits) {
-                    break;
-                }
+                    if ($isLastPage || $hasGallery || $this->outOfCredits) {
+                        break;
+                    }
 
-                $next = $indexPage->getNextCursor();
-                if (isset($seen[$next])) {
-                    Log::error(self::LOG_TAG, 'Feed "%s": page %s was already crawled, stopping', $feed->term, $next);
-                    break;
+                    $next = $indexPage->getNextCursor();
+                    if (isset($seen[$next])) {
+                        Log::error(self::LOG_TAG, 'Feed "%s": page %s was already crawled, stopping', $feed->term, $next);
+                        break;
+                    }
+                    $seen[$next] = true;
+                    $page++;
                 }
-                $seen[$next] = true;
-                $page++;
             }
+
+        } catch (ExClient_BannedException $e) {
+            // retrying would only extend the ban: stop this run, the next one continues
+            Log::error(self::LOG_TAG, '%s: stopped this run, the remaining galleries are tried again next time', $e->getMessage());
         }
 
         if ($this->outOfCredits) {
@@ -160,7 +166,7 @@ class ExArchiver
         $this->cache->deleteObject('gallery', $gallery->id);
 
         $galleryHtml = $this->client->gallery($gallery->exhenid, $gallery->hash);
-        if (!$galleryHtml) {
+        if (!$galleryHtml || $this->client->lastStatus >= 500) { // no answer, or a server error page
             Log::error(self::LOG_TAG, 'Failed to retrieve page from server: %s',
                 $this->client->lastError ?: 'HTTP '.$this->client->lastStatus);
             return;

@@ -21,6 +21,18 @@ final class ExClientTest extends TestCase
         return $method->invoke(new \ExClient(), $url);
     }
 
+    public function testBanExpiry(): void
+    {
+        $page = 'Your IP address has been temporarily banned for excessive pageloads which indicates that you are '
+            .'using automated mirroring/harvesting software. The ban expires in %s';
+
+        $this->assertSame('2 hours and 13 minutes', \ExClient::banExpiry(sprintf($page, '2 hours and 13 minutes')));
+        $this->assertSame('59 minutes and 48 seconds', \ExClient::banExpiry(sprintf($page, '59 minutes and 48 seconds')));
+        $this->assertSame('13 seconds', \ExClient::banExpiry(sprintf($page, '13 seconds')));
+        $this->assertSame('1 day, 2 hours and 5 minutes', \ExClient::banExpiry(sprintf($page, '1 day, 2 hours and 5 minutes')));
+        $this->assertNull(\ExClient::banExpiry('Your IP address has been temporarily banned.'));
+    }
+
     public function testUrlsUnchangedByDefault(): void
     {
         ConfigOverride::set((object)array());

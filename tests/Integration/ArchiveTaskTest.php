@@ -156,6 +156,104 @@ final class ArchiveTaskTest extends TestCase
         $this->assertSame('delta', array_slice(Stack::reindexHistory(), -1)[0]);
     }
 
+    private function queueBoth(): void
+    {
+        // archived in exhenid order, highest first: 4302753, then 3654969
+        foreach (Stack::GALLERIES as $gid => $token) {
+            Stack::fake()->gallery($gid, "gallery-$gid.html");
+            Stack::fake()->archive($gid, ZipFactory::standardEntries());
+            Api::data('addgallery', array('gid' => $gid, 'token' => $token));
+        }
+    }
+
+    public function testBanStopsTheRunCleanly(): void
+    {
+        $this->queueBoth();
+        Db::exec("insert into feed (term, archived, disabled, download) values ('eng', 0, 0, 0)");
+        Stack::fake()->index(array('' => 'index-page.html', '4314775' => 'index-last.html'));
+        Stack::fake()->block('ban', 100, 3); // the first gallery's page and archiver requests go through
+
+        $start = microtime(true);
+        $result = $this->archive();
+
+        $this->assertLessThan(20, microtime(true) - $start, 'no waiting for the ban to expire');
+        $this->assertStringContainsString(
+            'IP temporarily banned by ExHentai, expires in 2 hours and 13 minutes: stopped this run', $result['output']);
+        $this->assertSame('1', (string)Db::galleryByExhenid(4302753)['archived']);
+        $this->assertSame('0', (string)Db::galleryByExhenid(3654969)['archived']);
+        $this->assertSame(array(), $this->indexRequests(), 'no feed crawl');
+        $this->assertFileDoesNotExist(APP_ROOT.'/tmp/Task_Archive.pid', 'TaskRunner finished normally');
+
+        $ids = array_map(fn ($g) => (int)$g['id'], Api::data('galleries', array('search' => 'tomgirl'))['galleries']);
+        $this->assertSame(array((int)Db::galleryByExhenid(4302753)['id']), $ids, 'reindexed after stopping');
+    }
+
+    public function testWarningIsRetried(): void
+    {
+        $this->queue();
+        Stack::fake()->block('warn', 2);
+
+        $result = $this->archive();
+
+        $this->assertStringContainsString('Warned for opening pages too fast, waiting 0 s (1/3)', $result['output']);
+        $this->assertStringContainsString('Warned for opening pages too fast, waiting 0 s (2/3)', $result['output']);
+        $this->assertSame('1', (string)Db::galleryByExhenid(self::GID)['archived']);
+    }
+
+    public function testPersistentWarningStopsTheRun(): void
+    {
+        $this->queue();
+        Stack::fake()->block('warn', 100);
+
+        $result = $this->archive();
+
+        $this->assertStringContainsString('still warned for opening pages too fast after 3 retries: stopped this run', $result['output']);
+        $this->assertCount(4, Stack::fake()->requests(), 'the request and 3 retries');
+        $this->assertSame('0', (string)Db::galleryByExhenid(self::GID)['archived']);
+    }
+
+    public function testHangingPageTimesOutAndTheRunContinues(): void
+    {
+        $this->queueBoth();
+        Stack::fake()->gallery(4302753, 'gallery-4302753.html', array('sleep' => 4)); // requestTimeout is 2 s
+
+        $result = $this->archive();
+
+        $this->assertMatchesRegularExpression('~Failed to retrieve page from server: Operation timed out~', $result['output']);
+        $this->assertSame('0', (string)Db::galleryByExhenid(4302753)['archived']);
+        $this->assertSame('1', (string)Db::galleryByExhenid(3654969)['archived'], 'the next gallery is archived');
+    }
+
+    public function testServerErrorKeepsTheMetadata(): void
+    {
+        $this->queue();
+        Stack::fake()->gallery(self::GID, 'gallery-'.self::GID.'.html', array('status' => 503));
+
+        $result = $this->archive();
+
+        $this->assertStringContainsString('Failed to retrieve page from server: HTTP 503', $result['output']);
+        $this->assertSame(array(null, '0'), array(Db::galleryByExhenid(self::GID)['name'], (string)Db::galleryByExhenid(self::GID)['hasmeta']));
+    }
+
+    public function testRequestsUseACurrentUserAgent(): void
+    {
+        $this->queue();
+        $this->archive();
+
+        $this->assertStringContainsString('Chrome/142', Stack::fake()->requests()[0]['agent']);
+    }
+
+    public function testTagSearchUrl(): void
+    {
+        exec('cd '.escapeshellarg(APP_ROOT).' && php -r '.escapeshellarg(
+            'require "common.php"; (new ExClient())->tagSearch("female:big breasts"); (new ExClient())->tagSearch("x", "123");'
+        ).' 2>&1', $out, $ret);
+        $this->assertSame(0, $ret, implode("\n", $out));
+
+        $uris = array_map(fn ($r) => $r['uri'], Stack::fake()->requests());
+        $this->assertSame(array('/tag/female%3Abig%20breasts', '/tag/x?next=123'), $uris);
+    }
+
     public function testCopyrightClaimUnqueuesTheGallery(): void
     {
         Fixtures::requireAll('gallery-copyright.html');

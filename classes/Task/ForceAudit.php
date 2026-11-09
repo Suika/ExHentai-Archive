@@ -78,8 +78,12 @@ class Task_ForceAudit extends Task_Audit {
             exit;
         }
 
-        foreach($galleries as $gallery) {
-            $this->audit($gallery);
+        try {
+            foreach($galleries as $gallery) {
+                $this->audit($gallery); // a failed request leaves the gallery unchanged
+            }
+        } catch (ExClient_BannedException $e) {
+            Log::error(static::LOG_TAG, '%s: stopped this run', $e->getMessage());
         }
 
         Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
