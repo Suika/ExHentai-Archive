@@ -175,6 +175,12 @@ html.reader-active body {
     overflow: hidden;
 }
 
+/* In the reader a horizontal swipe turns the page: Chrome's swipe-to-go-back gesture would also go back
+   in the history afterwards (one page forward again). Only while reading; the list keeps it. */
+html.reader-active {
+    overscroll-behavior-x: none;
+}
+
 .reader-container .close.button {
     width: 40px;
 }

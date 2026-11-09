@@ -221,7 +221,7 @@ final class ArchiveTaskTest extends TestCase
 
         $this->assertMatchesRegularExpression('~Failed to retrieve page from server: Operation timed out~', $result['output']);
         $this->assertSame('0', (string)Db::galleryByExhenid(4302753)['archived']);
-        $this->assertSame('1', (string)Db::galleryByExhenid(3654969)['archived'], 'the next gallery is archived');
+        $this->assertSame('1', (string)Db::galleryByExhenid(3654969)['archived'], "the next gallery is archived:\n".$result['output']);
     }
 
     public function testServerErrorKeepsTheMetadata(): void
