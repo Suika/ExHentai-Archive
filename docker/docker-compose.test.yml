@@ -4,7 +4,6 @@
 #   docker compose -f docker-compose.test.yml build
 #   docker compose -f docker-compose.test.yml run --rm tests                       # all default tests
 #   docker compose -f docker-compose.test.yml run --rm tests --testsuite unit      # PHPUnit arguments
-#   TEST_MARIADB=11.4 docker compose -f docker-compose.test.yml run --rm tests      # other MariaDB version
 #   docker compose -f docker-compose.test.yml down -v                              # clean up
 #
 # The application code and tests are mounted, so code changes don't need a rebuild
@@ -12,33 +11,16 @@
 name: exhentai-archive-test
 
 services:
-  test-db:
-    image: mariadb:${TEST_MARIADB:-10.3}
-    environment:
-      - MARIADB_RANDOM_ROOT_PASSWORD=1
-      - MARIADB_DATABASE=exhen
-      - MARIADB_USER=exhen
-      - MARIADB_PASSWORD=exhen
-    tmpfs:
-      - /var/lib/mysql
-
   tests:
     image: exhentai-archive:test
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: test
-    depends_on:
-      - test-db
     environment:
-      - DB_HOST=test-db
-      - DB_NAME=exhen
-      - DB_USER=exhen
-      - DB_PASS=exhen
       - EX_ACCESSKEY=test-key
       - EX_ALLOW_DELETE=1
-      - REINDEX_POLL=0.2
-      # app clock ahead of the database (UTC): times written by PHP and compared by the database must not mix
+      # not UTC: dates written by PHP (local time) and compared by SQLite must not mix time zones
       - TZ=Asia/Tokyo
       - FAKE_EXHENTAI_URL=http://127.0.0.1:8090
       - FAKE_EXHENTAI_STATE=/var/tmp/fake-exhentai
@@ -49,7 +31,7 @@ services:
       - /var/www/exhen/images:uid=33,gid=33
       - /var/www/exhen/archive:uid=33,gid=33
       - /var/tmp/fake-exhentai
-      - /var/lib/sphinxsearch/data/exhen
+      - /var/www/exhen/data:uid=33,gid=33
     volumes:
       - ../classes:/var/www/exhen/classes:ro
       - ../www/js:/var/www/exhen/www/js:ro
@@ -58,6 +40,7 @@ services:
       - ../www/api.php:/var/www/exhen/www/api.php:ro
       - ../common.php:/var/www/exhen/common.php:ro
       - ../TaskRunner.php:/var/www/exhen/TaskRunner.php:ro
+      - ../import-mysql-dump.php:/var/www/exhen/import-mysql-dump.php:ro
       - ../db.sql:/var/www/exhen/db.sql:ro
       - ../phpunit.xml.dist:/var/www/exhen/phpunit.xml.dist:ro
       - ../tests:/var/www/exhen/tests

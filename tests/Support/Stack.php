@@ -5,12 +5,10 @@ namespace Tests\Support;
 use PHPUnit\Framework\Assert;
 
 /**
- * The running app inside the test container: data reset, search reindex, CLI tasks and test data.
+ * The running app inside the test container: data reset, CLI tasks and test data.
  */
 final class Stack
 {
-    public const SEARCH_DATA = '/var/lib/sphinxsearch/data/exhen';
-
     /** ExHentai galleries with a saved page in tests/fixtures/exhentai: gid => token */
     public const GALLERIES = array(3654969 => 'c55b7392ac', 4302753 => '6b515751d9');
 
@@ -26,7 +24,6 @@ final class Stack
      */
     public static function reset(): void
     {
-        self::waitForReindex();
         Db::reset();
 
         foreach (array('archive', 'images', 'tmp') as $dir) {
@@ -35,7 +32,6 @@ final class Stack
 
         self::flushCache();
         self::fake()->reset();
-        self::reindex();
     }
 
     public static function flushCache(): void
@@ -46,52 +42,13 @@ final class Stack
     }
 
     /**
-     * Rebuilds the search indexes like the container entry point does (as root, so searchd rotates them)
-     * and waits until searchd has loaded the new files.
+     * Rebuilds the search index, for rows that a test changed directly in the database (the app keeps it
+     * up to date itself when it stores galleries).
      */
     public static function reindex(): void
     {
-        self::waitForReindex();
-        exec('indexer --config /etc/manticoresearch/manticore.conf --all --rotate 2>&1', $out, $ret);
-        Assert::assertSame(0, $ret, "indexer failed:\n".implode("\n", $out));
-        self::waitForRotation();
-    }
-
-    /**
-     * Waits until the background reindex worker (docker/reindexer.sh) has handled all requests.
-     */
-    public static function waitForReindex(int $timeoutSeconds = 60): void
-    {
-        $tmp = APP_ROOT.'/tmp';
-        $end = microtime(true) + $timeoutSeconds;
-        while (microtime(true) < $end) {
-            clearstatcache();
-            $busy = file_exists($tmp.'/reindex-full.request') || file_exists($tmp.'/reindex-delta.request')
-                || file_exists($tmp.'/reindex.running') || glob(self::SEARCH_DATA.'/*.new.*');
-            if (!$busy) {
-                return;
-            }
-            usleep(100000);
-        }
-        Assert::fail('The reindex worker did not finish in time');
-    }
-
-    /** @return string[] runs finished by the reindex worker since the last reset ("full" or "delta") */
-    public static function reindexHistory(): array
-    {
-        $file = APP_ROOT.'/tmp/reindex.history';
-        return is_file($file) ? file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : array();
-    }
-
-    public static function waitForRotation(): void
-    {
-        for ($i = 0; $i < 200; $i++) {
-            if (!glob(self::SEARCH_DATA.'/*.new.*')) {
-                return;
-            }
-            usleep(50000);
-        }
-        Assert::fail('searchd did not rotate the new index files');
+        exec('cd '.escapeshellarg(APP_ROOT).' && php -r '.escapeshellarg('require "common.php"; Search::rebuild();').' 2>&1', $out, $ret);
+        Assert::assertSame(0, $ret, "Rebuilding the search index failed:\n".implode("\n", $out));
     }
 
     /**
@@ -106,9 +63,6 @@ final class Stack
             $cmd .= ' '.escapeshellarg($arg);
         }
         exec($cmd.' 2>&1', $out, $ret);
-
-        // tasks that changed galleries request a background reindex; wait until it is done
-        self::waitForReindex();
 
         return array('code' => $ret, 'output' => implode("\n", $out));
     }

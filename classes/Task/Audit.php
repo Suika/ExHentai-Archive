@@ -15,18 +15,23 @@ class Task_Audit extends Task_Abstract {
     public function run($options = array()) {
         $this->client = new ExClient();
 
-        $interval = isset($options[0]) ? $options[0] : "1 year";
+        $interval = self::sqliteInterval(isset($options[0]) ? $options[0] : '1 year');
+        if ($interval === null) {
+            Log::error(static::LOG_TAG, 'Invalid interval "%s", expected e.g. "1 year", "6 months", "2 weeks" or "30 days"', $options[0]);
+            return;
+        }
         $skipped = array();   // galleries whose request failed: not marked, checked again by the next run
         $failuresInARow = 0;
 
         try {
             while(true) {
+                // dates are compared in the app's time zone (galleries store PHP's local time)
                 $sql = 'archived = 1 and deleted = 0 and source = 0 and'.
-                    '((added <= date_sub(date(now()), interval 3 day) and'. // if added more than 3 days ago...
-                    '(posted >= date_sub(date(now()), interval ' . $interval . ') or (lastaudit is null)) and'. // and if the gallery is more than input old but NOT if it's unaudited
-                    '(lastaudit is null or lastaudit <= date_sub(date(now()), interval 7 day))) or'. // ...and not yet audited, or audited more than 7 days ago
-                    '((added >= date_sub(date(now()), interval 7 day) and added <= date_sub(date(now()), interval 1 day)) and'. // OR, added less than 7 days ago (but more than 24 hours ago)...
-                    '(lastaudit is null or lastaudit <= date_sub(date(now()), interval 1 day))))'; // ...and not yet audited, or audited more than 1 day ago
+                    "((added <= datetime('now', 'localtime', 'start of day', '-3 days') and". // if added more than 3 days ago...
+                    "(posted >= datetime('now', 'localtime', 'start of day', '$interval') or (lastaudit is null)) and". // and if the gallery is more than input old but NOT if it's unaudited
+                    "(lastaudit is null or lastaudit <= datetime('now', 'localtime', 'start of day', '-7 days'))) or". // ...and not yet audited, or audited more than 7 days ago
+                    "((added >= datetime('now', 'localtime', 'start of day', '-7 days') and added <= datetime('now', 'localtime', 'start of day', '-1 days')) and". // OR, added less than 7 days ago (but more than 24 hours ago)...
+                    "(lastaudit is null or lastaudit <= datetime('now', 'localtime', 'start of day', '-1 days'))))"; // ...and not yet audited, or audited more than 1 day ago
                 if ($skipped) {
                     $sql = '('.$sql.') and id not in ('.R::genSlots($skipped).')';
                 }
@@ -54,8 +59,26 @@ class Task_Audit extends Task_Abstract {
             // retrying would only extend the ban: stop this run, the next one continues
             Log::error(static::LOG_TAG, '%s: stopped this run', $e->getMessage());
         }
+    }
 
-        Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
+    /**
+     * The interval option ("1 year", "6 months", "2 weeks", "30 day") as an SQLite date modifier
+     * ("-1 years"), or null if it is not one.
+     */
+    protected static function sqliteInterval($interval)
+    {
+        if (!preg_match('/^\s*(\d+)\s*(day|week|month|year)s?\s*$/i', (string)$interval, $m)) {
+            return null;
+        }
+
+        $count = (int)$m[1];
+        $unit = strtolower($m[2]);
+        if ($unit === 'week') {
+            $count *= 7;
+            $unit = 'day';
+        }
+
+        return sprintf('-%d %ss', $count, $unit);
     }
 
     /**

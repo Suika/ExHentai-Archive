@@ -35,7 +35,7 @@ final class AuditTaskTest extends TestCase
         $this->assertSame(0, $result['code'], $result['output']);
 
         $id = (int)Db::galleryByExhenid($gid)['id'];
-        Db::exec('update gallery set added = now() - interval 10 day, posted = now() - interval 30 day where id = ?', array($id));
+        Db::exec("update gallery set added = datetime('now', 'localtime', '-10 days'), posted = datetime('now', 'localtime', '-30 days') where id = ?", array($id));
 
         return $id;
     }
@@ -157,7 +157,7 @@ final class AuditTaskTest extends TestCase
         // more galleries due for an audit than the failure limit
         for ($i = 1; $i <= 7; $i++) {
             Db::exec("insert into gallery (exhenid, hash, name, archived, download, deleted, source, added, posted, updated)
-                values (?, 'abc', ?, 1, 1, 0, 0, now() - interval 10 day, now() - interval 30 day, now())", array(1000 + $i, "Outage $i"));
+                values (?, 'abc', ?, 1, 1, 0, 0, datetime('now', 'localtime', '-10 days'), datetime('now', 'localtime', '-30 days'), datetime('now', 'localtime'))", array(1000 + $i, "Outage $i"));
         }
         Stack::fake()->block('down', 1000);
         Stack::fake()->clearRequests();
@@ -206,12 +206,12 @@ final class AuditTaskTest extends TestCase
     public function testAuditSelection(): void
     {
         // added today: not audited yet
-        Db::exec('update gallery set added = now() where id = ?', array($this->id));
+        Db::exec("update gallery set added = datetime('now', 'localtime') where id = ?", array($this->id));
         $this->runTask('Audit');
         $this->assertNull(Db::gallery($this->id)['lastaudit']);
 
         // added two days ago: audited (daily for the first week)
-        Db::exec('update gallery set added = now() - interval 2 day where id = ?', array($this->id));
+        Db::exec("update gallery set added = datetime('now', 'localtime', '-2 days') where id = ?", array($this->id));
         $this->runTask('Audit');
         $audited = Db::gallery($this->id)['lastaudit'];
         $this->assertNotNull($audited);

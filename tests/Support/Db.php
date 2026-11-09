@@ -16,11 +16,13 @@ final class Db
     {
         if (!self::$pdo) {
             self::$pdo = new PDO(
-                sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', getenv('DB_HOST'), getenv('DB_NAME')),
-                getenv('DB_USER'),
-                getenv('DB_PASS'),
-                array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC)
+                'sqlite:'.getenv('DB_PATH'),
+                null,
+                null,
+                array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_STRINGIFY_FETCHES => true) // values as strings, like the app (RedBean) gets them
             );
+            self::$pdo->exec('PRAGMA busy_timeout = 10000');
         }
 
         return self::$pdo;
@@ -70,9 +72,7 @@ final class Db
     public static function reset(): void
     {
         self::$pdo = null;
-        $cmd = sprintf('mariadb --skip-ssl -h %s -u %s -p%s < %s 2>&1',
-            escapeshellarg(getenv('DB_HOST')), escapeshellarg(getenv('DB_USER')),
-            escapeshellarg(getenv('DB_PASS')), escapeshellarg(APP_ROOT.'/db.sql'));
+        $cmd = sprintf('sqlite3 %s < %s 2>&1', escapeshellarg(getenv('DB_PATH')), escapeshellarg(APP_ROOT.'/db.sql'));
         exec($cmd, $out, $ret);
         if ($ret !== 0) {
             throw new \RuntimeException("Loading db.sql failed:\n".implode("\n", $out));

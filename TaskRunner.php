@@ -82,10 +82,6 @@ if ($task == "Full") {
     
     echo "<br>";
     
-    Search::requestReindex(true);
-    echo "Full search index rebuild requested";
-    
-    echo "<br>";
 } else {
     $task = new $name();
     $task->run($opts);

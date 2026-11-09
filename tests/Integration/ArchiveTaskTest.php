@@ -152,8 +152,7 @@ final class ArchiveTaskTest extends TestCase
 
         $ids = array_map(fn ($g) => (int)$g['id'], Api::data('galleries', array('search' => 'tomgirl'))['galleries']);
         $this->assertSame(array((int)Db::galleryByExhenid(4302753)['id']), $ids,
-            'the gallery downloaded before is searchable (partial reindex ran)');
-        $this->assertSame('delta', array_slice(Stack::reindexHistory(), -1)[0]);
+            'the gallery downloaded before is searchable');
     }
 
     private function queueBoth(): void
@@ -185,7 +184,7 @@ final class ArchiveTaskTest extends TestCase
         $this->assertFileDoesNotExist(APP_ROOT.'/tmp/Task_Archive.pid', 'TaskRunner finished normally');
 
         $ids = array_map(fn ($g) => (int)$g['id'], Api::data('galleries', array('search' => 'tomgirl'))['galleries']);
-        $this->assertSame(array((int)Db::galleryByExhenid(4302753)['id']), $ids, 'reindexed after stopping');
+        $this->assertSame(array((int)Db::galleryByExhenid(4302753)['id']), $ids, 'searchable after stopping');
     }
 
     public function testWarningIsRetried(): void

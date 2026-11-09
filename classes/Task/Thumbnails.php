@@ -5,7 +5,7 @@ class Task_Thumbnails extends Task_Abstract {
 	const LOG_TAG = 'Task_Thumbnails';
 
 	public function run($options = array()) {
-		$galleries = R::find('gallery', 'numfiles != (SELECT count(*) FROM exhen.gallery_thumb where gallery_thumb.type = 2 and gallery_id = gallery.id)');
+		$galleries = R::find('gallery', 'numfiles != (SELECT count(*) FROM gallery_thumb where gallery_thumb.type = 2 and gallery_id = gallery.id)');
 
 		$count = 0;
 
@@ -56,7 +56,7 @@ class Task_Thumbnails extends Task_Abstract {
 			$galleries = R::find('gallery',
 				'archived = 1 and deleted = 0 and id > ? and not exists ('.
 				'select 1 from gallery_thumb where gallery_thumb.gallery_id = gallery.id '.
-				'and gallery_thumb.type = ? and gallery_thumb.index = 0) order by id limit 200',
+				'and gallery_thumb.type = ? and gallery_thumb."index" = 0) order by id limit 200',
 				array($lastId, Model_Gallery::THUMB_LARGE));
 
 			if (count($galleries) === 0) {

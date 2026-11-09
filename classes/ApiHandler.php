@@ -333,7 +333,6 @@ class ApiHandler
             } else {
                 $gallery->deleted = 1;
                 R::store($gallery);
-                Search::updateAttributes($gallery->id, array('deleted' => 1));
 
                 $this->sendSuccess(true);
             }
@@ -406,9 +405,10 @@ class ApiHandler
     {
         header('Content-Type: text/plain');
 
-        // runs in the background (docker/reindexer.sh); without a worker the command runs right here
-        Search::requestReindex(true);
-        echo "Reindex requested\n";
+        // the index is kept up to date when galleries are stored; this rebuilds it completely (maintenance)
+        set_time_limit(0);
+        $count = Search::rebuild();
+        echo "Search index rebuilt: $count galleries\n";
         exit;
     }
 
@@ -435,10 +435,9 @@ class ApiHandler
         }
 
         try {
-            SphinxQL::query('select id from galleries limit 1');
+            R::getCell('select rowid from gallery_fts limit 1');
             $checks['search'] = true;
         } catch (Throwable $e) {
-            R::selectDatabase('default');
             $checks['search'] = false;
         }
 
@@ -461,9 +460,6 @@ class ApiHandler
             $cache = Cache::getInstance();
             $cache->deleteObject('gallery', $gallery->id);
 
-            // the read filter uses the search index: change it there right away instead of reindexing
-            Search::updateAttributes($gallery->id, array('read' => (string)$gallery->read));
-
             $this->sendSuccess($gallery->read);
         } else {
             $this->sendFail();
@@ -483,8 +479,6 @@ class ApiHandler
             
             $cache = Cache::getInstance();
             $cache->deleteObject('gallery', $gallery->id);
-
-            Search::updateAttributes($gallery->id, array('color' => (string)$gallery->color));
 
             $this->sendSuccess($gallery->color);
         } else {

@@ -85,8 +85,6 @@ class Task_ForceAudit extends Task_Audit {
         } catch (ExClient_BannedException $e) {
             Log::error(static::LOG_TAG, '%s: stopped this run', $e->getMessage());
         }
-
-        Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
     }
 
     // audit() and tagsDiff() are inherited from Task_Audit

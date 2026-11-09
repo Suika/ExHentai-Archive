@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c7d634f79fc91b97057da67efd026b27",
+    "content-hash": "835ffdfa6621cf6e02e7a28042456633",
     "packages": [
         {
             "name": "gabordemooij/redbean",
@@ -3033,7 +3033,7 @@
         "ext-gd": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "ext-pdo_mysql": "*",
+        "ext-pdo_sqlite": "*",
         "ext-phar": "*",
         "ext-zip": "*"
     },

@@ -27,8 +27,13 @@ if(php_sapi_name() !== 'cli') {
 
 $config = Config::get();
 
-R::setup($config->db->dsn, $config->db->user, $config->db->pass);
+R::setup($config->db->dsn, $config->db->user ?? null, $config->db->pass ?? null);
 R::freeze(true);
+
+// SQLite: wait for a running write instead of failing right away ("database is locked"), and enforce
+// the foreign keys (ON DELETE SET NULL, as in the former MariaDB schema)
+R::exec('PRAGMA busy_timeout = 10000');
+R::exec('PRAGMA foreign_keys = ON');
 
 
 ?>

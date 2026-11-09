@@ -5,9 +5,9 @@ frontend, bug fixes) can be changed safely:
 
 | Suite | What | Needs |
 |---|---|---|
-| `unit` | HTML parsers (gallery, feed index, archiver pages), search escaping, tag diff of Audit, config, ExClient URL seam, image engine (libvips and GD) | nothing |
+| `unit` | HTML parsers (gallery, feed index, archiver pages), search query syntax, tag diff of Audit, config, ExClient URL seam, image engine (libvips and GD) | nothing |
 | `browser` | the UI in headless Chromium at desktop and phone size (touch, DPR 3): list, infinite scroll, search suggestions, single and multi page reader with keys, taps, swipes and the touch controls, delete switch | the running app stack, Chromium (test image only) |
-| `integration` | API (list, search, filters, paging, gallery, suggestions, stats, reader pages, thumbnails, downloads, write calls) and the tasks (Archive, Audit/ForceAudit, Thumbnails, Cleanup, AddGallery, EditGallery, TaskRunner) | the running app stack, MariaDB, fake ExHentai |
+| `integration` | API (list, search, filters, paging, gallery, suggestions, stats, reader pages, thumbnails, downloads, write calls) and the tasks (Archive, Audit/ForceAudit, Thumbnails, Cleanup, AddGallery, EditGallery, TaskRunner) | the running app stack (SQLite database), fake ExHentai |
 
 `Support/Browser.php` drives Chromium (chrome-php/chrome); its `screenshot()` helps when changing the layout.
 
@@ -17,8 +17,8 @@ saved pages in `fixtures/exhentai/`, so tests never contact the real site.
 
 ## Running
 
-Everything runs in Docker (`docker/docker-compose.test.yml`): a MariaDB container and the test image
-(the app image plus PHPUnit, Dockerfile target `test`).
+Everything runs in Docker (`docker/docker-compose.test.yml`): the test image (the app image plus PHPUnit,
+Dockerfile target `test`) with its SQLite database on a tmpfs.
 
 ```sh
 cd docker
@@ -26,12 +26,11 @@ docker compose -f docker-compose.test.yml build                      # after Doc
 docker compose -f docker-compose.test.yml run --rm tests             # all tests (~1.5 min)
 docker compose -f docker-compose.test.yml run --rm tests --testsuite unit
 docker compose -f docker-compose.test.yml run --rm tests --filter ApiReadTest
-TEST_MARIADB=11.4 docker compose -f docker-compose.test.yml run --rm tests   # default is 10.3 (prod)
 SHOW_STACK_LOG=1 docker compose -f docker-compose.test.yml run --rm tests    # print the app log on failure
 docker compose -f docker-compose.test.yml down -v                    # remove the containers
 ```
 
-`classes/`, `www/`, `TaskRunner.php`, `common.php`, `db.sql` and `tests/` are mounted into the container,
+`classes/`, `www/`, `TaskRunner.php`, `common.php`, `import-mysql-dump.php`, `db.sql` and `tests/` are mounted into the container,
 so code and test changes don't need a rebuild.
 
 Every integration test class starts from an empty database (`db.sql`), archive, images, cache and search

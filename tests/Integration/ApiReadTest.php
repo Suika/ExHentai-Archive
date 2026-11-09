@@ -54,7 +54,6 @@ final class ApiReadTest extends TestCase
         Api::data('updateColor', array('id' => self::$pixiv, 'color' => 'red'));
 
         Stack::flushCache();
-        Stack::reindex();
     }
 
     private static function ids(array $data): array

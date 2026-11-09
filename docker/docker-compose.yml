@@ -1,19 +1,8 @@
- services:
-  exhen-db:
-    image: mariadb:11.4
-    container_name: exhen-db
-    command: [ '--wait_timeout=28800', ]
-    ports:
-      - 3306:3306
-    volumes:
-      - ./exhen-db:/var/lib/mysql
-    environment:
-      - MARIADB_AUTO_UPGRADE=1
-      # - MARIADB_RANDOM_ROOT_PASSWORD=1
-      # - MARIADB_DATABASE=exhen
-      # - MARIADB_USER=exhen
-      # - MARIADB_PASSWORD=exhen
-    restart: always
+# The database is one SQLite file in ./exhen/data (created on the first start).
+# Migrating from MariaDB: dump it (mysqldump exhen > dump.sql), put the dump into ./exhen/data and,
+# before the first start, run
+#   docker compose run --rm exhen php import-mysql-dump.php data/dump.sql
+services:
   exhen:
     image: suika/exhentai-archive:latest
     build:
@@ -21,21 +10,15 @@
       dockerfile: docker/Dockerfile
     container_name: exhen
     restart: unless-stopped
-    depends_on:
-      - exhen-db
     ports:
       - 6767:6767
     tmpfs:
       - /var/www/exhen/tmp
     volumes:
-      - ./exhen/sphinx:/var/lib/sphinxsearch/data/exhen
+      - ./exhen/data:/var/www/exhen/data
       - ./exhen/images:/var/www/exhen/images
       - ./exhen/archive:/var/www/exhen/archive
     environment:
-      - DB_HOST=exhen-db
-      - DB_NAME=exhen
-      - DB_USER=exhen
-      - DB_PASS=exhen
       - EX_ACCESSKEY=UGANDA
       - NGINX_PORT=6767
       - EX_MEMBERID=you

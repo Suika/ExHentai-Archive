@@ -21,7 +21,6 @@ final class ApiWriteTest extends TestCase
     {
         Stack::reset();
         $this->gallery = Stack::seedManualGallery('Write Test Gallery', ZipFactory::standardEntries(), array('female:glasses'));
-        Stack::reindex();
     }
 
     public function testAddGalleryQueuesADownload(): void
@@ -132,10 +131,8 @@ final class ApiWriteTest extends TestCase
         }
     }
 
-    public function testFiltersFollowUpdatesWithoutReindex(): void
+    public function testFiltersFollowUpdatesRightAway(): void
     {
-        // B9: read/colour are changed in the live search index right away (no indexing at all)
-        $runs = Stack::reindexHistory();
         Api::data('update', array('id' => $this->gallery, 'readStatus' => 1));
         Api::data('updateColor', array('id' => $this->gallery, 'color' => 'red'));
 
@@ -143,12 +140,6 @@ final class ApiWriteTest extends TestCase
         $this->assertSame(array($this->gallery), $ids(array('read' => 1)));
         $this->assertSame(array(), $ids(array('read' => 0)));
         $this->assertSame(array($this->gallery), $ids(array('color' => 'red')));
-        usleep(500000);
-        $this->assertSame($runs, Stack::reindexHistory(), 'no reindex was requested');
-        $this->assertFileDoesNotExist(APP_ROOT.'/tmp/reindex-delta.request');
-
-        // the database has the same values, so a later full rebuild keeps them
-        Stack::reindex();
-        $this->assertSame(array($this->gallery), $ids(array('read' => 1, 'color' => 'red')));
+        $this->assertSame(array($this->gallery), $ids(array('read' => 1, 'color' => 'red', 'search' => 'glasses')));
     }
 }

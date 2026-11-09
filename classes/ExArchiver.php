@@ -12,9 +12,6 @@ class ExArchiver
     /** set when ExHentai answers "Insufficient Credits.": no further downloads in this run */
     protected $outOfCredits = false;
 
-    /** galleries whose search data changed in this run (downloaded or new metadata) */
-    protected $changedCount = 0;
-
     public function __construct()
     {
         $this->client = new ExClient();
@@ -153,10 +150,6 @@ class ExArchiver
         }
 
         Log::debug(self::LOG_TAG, 'Archive complete. Archived %d galleries.', $archivedCount);
-
-        if ($archivedCount > 0 || $this->changedCount > 0) {
-            Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
-        }
     }
 
     protected function archiveGallery($gallery)
@@ -211,7 +204,6 @@ class ExArchiver
         $gallery->addProperties($props);
 
         $gallery->hasmeta = true;
-        $this->changedCount++;
 
         if ($gallery->download) {
             //delete if gallery zip exists (it shouldn't)

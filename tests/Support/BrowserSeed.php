@@ -20,8 +20,8 @@ final class BrowserSeed
         // list-only rows (no archive): enough for infinite scroll
         for ($i = 1; $i <= $extra; $i++) {
             Db::exec("insert into gallery (name, archived, added, posted, numfiles, filesize, source, deleted, download, hasmeta, updated)
-                values (?, 1, now(), '2025-01-01 00:00:00' - interval ? day, 5, 1000, 1, 0, 1, 1, now() - interval 1 minute)",
-                array(sprintf('Filler Gallery %02d', $i), $i));
+                values (?, 1, datetime('now', 'localtime'), datetime('2025-01-01 00:00:00', ?), 5, 1000, 1, 0, 1, 1, datetime('now', 'localtime'))",
+                array(sprintf('Filler Gallery %02d', $i), "-$i days"));
         }
 
         Stack::reindex();

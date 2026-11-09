@@ -13,79 +13,71 @@ class Model_Gallery extends Model_Abstract
 
     const GP_PER_MB = 41.9435018158;
 
+    /**
+     * Gallery list for the API: filters, full text search (Search, table gallery_fts) and sorting.
+     *
+     * @return array{result: array, meta: stdClass} result: rows with "id" (and "ranked_weight" for the
+     *                                              order "weight"), meta->total: number of all matches
+     */
     public static function search($page, $pagesize, $search, $order, $randomSeed = null, $unarchived = false, $read = false, $color = false)
     {
-        $query = new QueryHelper();
-
-        if ($order === 'random') {
-            $query->sql('select *, crc32(to_string(id + :seed)) as rnd from galleries');
-            $query->addParams(array('seed' => $randomSeed));
-        } elseif ($order === 'weight') {
-            $query->sql('select *, weight() as ranked_weight from galleries');
-        } else {
-            $query->sql('select * from galleries');
-        }
-
-        $query->sql('where deleted < 3');
+        $from = 'gallery';
+        $where = array('gallery.deleted < 3');
+        $params = array();
 
         if (!$unarchived) {
-            $query->sql('and archived = 1');
+            $where[] = 'gallery.archived = 1';
         }
-        
+
         if ($read !== false) {
-            // "read" is a string attribute in the search index; Manticore rejects comparing it with an integer
-            $query->sql('and read = :read')
-                ->addParams(array('read' => array((string)$read, PDO::PARAM_STR)));
+            $where[] = 'gallery.read = ?';
+            $params[] = (int)$read;
         }
-        
+
         if ($color !== false) {
-            $query->sql('and color = :color')
-                ->addParams(array('color' => $color));
+            $where[] = 'gallery.color = ?';
+            $params[] = (string)$color;
         }
 
-        if ($search) {
-            $search = SphinxQL::halfEscapeMatch($search);
-            
-            $query->sql('and match(:match)')
-                ->addParams(array('match' =>  $search));
+        $match = Search::matchQuery($search);
+        if ($match['match'] !== null) {
+            $from .= ' join gallery_fts on gallery_fts.rowid = gallery.id';
+            $where[] = 'gallery_fts match ?';
+            $params[] = $match['match'];
+        } elseif ($match['exclude'] !== null) {
+            $where[] = 'gallery.id not in (select rowid from gallery_fts where gallery_fts match ?)';
+            $params[] = $match['exclude'];
+        } elseif (trim((string)$search) !== '') {
+            $where[] = '0'; // nothing searchable in it ("a", "-"): no results, as before
         }
 
-        if ($order === 'added') {
-            $query->sql('order by added desc');
-        } elseif ($order === 'random') {
-            $query->sql('order by rnd asc');
-        } elseif ($order === 'weight') {
-            $query->sql('order by ranked_weight desc, posted desc');
-        } else {
-            $query->sql('order by posted desc');
-        }
+        $where = ' where '.implode(' and ', $where);
 
-        if ($page >= 0 && $pagesize) {
-            $query->sql('limit :offset, :limit')
-                ->addParams(array(
-                    'offset' => (int)($page * $pagesize),
-                    'limit' => (int)$pagesize
-                ));
-        }
-
+        $select = 'gallery.id';
         if ($order === 'weight') {
-            $query->sql('option ranker = wordcount,');
+            // bm25: lower is better; exported as before, higher is better
+            $select .= $match['match'] !== null ? ', -bm25(gallery_fts) as ranked_weight' : ', 0 as ranked_weight';
+            $orderBy = 'ranked_weight desc, gallery.posted desc';
+        } elseif ($order === 'added') {
+            $orderBy = 'gallery.added desc';
+        } elseif ($order === 'random') {
+            // same order as before (Manticore: crc32(to_string(id + seed))), stable per seed for paging
+            Search::registerFunctions();
+            $orderBy = 'crc32(gallery.id + '.(int)$randomSeed.')';
         } else {
-            $query->sql('option ranker = none,');
+            $orderBy = 'gallery.posted desc';
         }
 
-        $maxMatches = 500000;
-        $query->sql('max_matches = '.$maxMatches);
-
-        $result = SphinxQL::query($query->getSql(), $query->getParams());
-        $meta = SphinxQL::getMeta();
-
-        // Sphinx 2.2 reported "total" as all retrievable matches (total_found capped by max_matches);
-        // Manticore reports only the rows of the current page. The API's "end" flag and the result
-        // counter rely on the Sphinx meaning, so restore it.
-        if (isset($meta->total_found)) {
-            $meta->total = (string)min((int)$meta->total_found, $maxMatches);
+        $sql = 'select '.$select.' from '.$from.$where.' order by '.$orderBy.', gallery.id';
+        if ($page >= 0 && $pagesize) {
+            $sql .= sprintf(' limit %d offset %d', (int)$pagesize, (int)$page * (int)$pagesize);
         }
+
+        $result = R::getAll($sql, $params);
+
+        $meta = new stdClass();
+        $meta->total = (string)R::getCell('select count(*) from '.$from.$where, $params);
+        $meta->total_found = $meta->total;
 
         return array('result' => $result, 'meta' => $meta);
     }
@@ -242,7 +234,7 @@ class Model_Gallery extends Model_Abstract
     public function getThumbnail($index, $type, $create = true)
     {
         if ($this->archived) {
-            $link = $this->unbox()->withCondition('gallery_thumb.index = ? and gallery_thumb.type = ?', array($index, $type))->via('gallery_thumb')->ownGalleryThumb;
+            $link = $this->unbox()->withCondition('gallery_thumb."index" = ? and gallery_thumb.type = ?', array($index, $type))->via('gallery_thumb')->ownGalleryThumb;
 
             if (count($link) > 0) {
                 $link = array_pop($link);
@@ -294,11 +286,19 @@ class Model_Gallery extends Model_Abstract
 
     public function update()
     {
-        // The search index picks up changed galleries by comparing "updated" with MariaDB's NOW()
-        // (sph_counter, docker/manticore.conf), so it has to come from the database clock. PHP's date()
-        // uses the container time zone (TZ), which can be ahead of the database (e.g. London summer time
-        // vs UTC): such galleries stayed out of the index until a later reindex.
-        $this->updated = R::getCell('SELECT NOW()');
+        $this->updated = date('Y-m-d H:i:s');
+    }
+
+    /** RedBean: after the gallery and its lists (tags) were stored */
+    public function after_update()
+    {
+        Search::indexGallery($this->bean->id);
+    }
+
+    /** RedBean: before the gallery is removed (R::trash) */
+    public function delete()
+    {
+        Search::removeGallery($this->bean->id);
     }
 
     public function getRoundedId()
@@ -312,12 +312,12 @@ class Model_Gallery extends Model_Abstract
             'select
 				count(id) as count_total,
 				sum(filesize) as filesize,
-				round(sum(filesize) / pow(1024, 3), 2) as filesize_gb,
+				round(sum(filesize) / 1073741824.0, 2) as filesize_gb,
 				(select count(id) from gallery where archived = 1) as count_archived,
 				(select count(id) from gallery where deleted >= 1) as count_deleted,
-				round((sum(filesize) / (select count(id) from gallery where archived = 1)) / pow(1024, 2), 2) as filesize_average_mb,
-				sum(round(round(filesize / pow(1024, 2), 2) * 41.9435018158)) as gp_total,
-				round(sum(round(filesize / pow(1024, 2), 2) * 41.9435018158) / (select count(id) from gallery where archived = 1)) as gp_average
+				round((sum(filesize) * 1.0 / (select count(id) from gallery where archived = 1)) / 1048576.0, 2) as filesize_average_mb,
+				sum(round(round(filesize / 1048576.0, 2) * 41.9435018158)) as gp_total,
+				round(sum(round(filesize / 1048576.0, 2) * 41.9435018158) / (select count(id) from gallery where archived = 1)) as gp_average
 			from gallery
 			limit 1';
 
@@ -372,7 +372,8 @@ class Model_Gallery extends Model_Abstract
             R::store($galleryAttr);
 
             if ($name === 'Posted') {
-                $this->unbox()->posted = $value;
+                // "2026-11-03 19:38" from ExHentai: stored with seconds, as MariaDB's datetime did
+                $this->unbox()->posted = preg_match('/^\d{4}-\d\d-\d\d \d\d:\d\d$/', $value) ? $value.':00' : $value;
             }
         }
     }

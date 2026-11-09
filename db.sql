@@ -1,199 +1,112 @@
-CREATE DATABASE IF NOT EXISTS `exhen` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
-USE `exhen`;
--- ExHentai-Archive database schema (MariaDB)
--- Taken from the production schema (MariaDB 10.3, 2026-11-08): gallery.filesize is bigint so
--- archives over 4 GiB fit, gallery.name/origtitle are varchar(1024).
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
+-- ExHentai-Archive database schema (SQLite)
+-- Same tables and columns as the former MariaDB schema, so import-mysql-dump.php copies a MariaDB dump
+-- 1:1 (ids included). Dates are stored as text 'YYYY-MM-DD HH:MM:SS'.
 --
--- Table structure for table `feed`
---
+-- Create a database:  sqlite3 exhen.sqlite < db.sql   (the Docker entry point does this on the first start)
 
-DROP TABLE IF EXISTS `feed`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `feed` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `term` varchar(45) DEFAULT NULL,
-  `archived` tinyint(4) NOT NULL DEFAULT 0,
-  `disabled` tinyint(4) NOT NULL DEFAULT 0,
-  `download` tinyint(4) NOT NULL DEFAULT 1,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+-- readers (web) don't block the writer (tasks) and the other way round; stored in the database file
+PRAGMA journal_mode = WAL;
 
---
--- Table structure for table `gallery`
---
+DROP TABLE IF EXISTS gallery_fts;
+DROP TABLE IF EXISTS gallery_tag;
+DROP TABLE IF EXISTS gallery_thumb;
+DROP TABLE IF EXISTS galleryproperty;
+DROP TABLE IF EXISTS gallery;
+DROP TABLE IF EXISTS feed;
+DROP TABLE IF EXISTS image;
+DROP TABLE IF EXISTS tag;
+DROP TABLE IF EXISTS tagnamespace;
 
-DROP TABLE IF EXISTS `gallery`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `gallery` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `exhenid` int(11) unsigned DEFAULT NULL,
-  `hash` varchar(255) DEFAULT NULL,
-  `name` varchar(1024) DEFAULT NULL,
-  `added` datetime DEFAULT NULL,
-  `archived` tinyint(3) unsigned DEFAULT 0,
-  `origtitle` varchar(1024) DEFAULT NULL,
-  `type` varchar(255) DEFAULT NULL,
-  `posted` datetime DEFAULT NULL,
-  `numfiles` int(11) DEFAULT NULL,
-  `filesize` bigint(20) unsigned DEFAULT NULL,
-  `deleted` tinyint(4) DEFAULT 0,
-  `lastaudit` datetime DEFAULT NULL,
-  `updated` datetime DEFAULT NULL,
-  `feed_id` int(11) unsigned DEFAULT NULL,
-  `hasmeta` tinyint(4) DEFAULT 0,
-  `download` tinyint(4) DEFAULT 1,
-  `source` tinyint(4) DEFAULT 0,
-  `read` tinyint(4) DEFAULT 0,
-  `color` varchar(255) DEFAULT 'black',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `exhenid_UNIQUE` (`exhenid`),
-  KEY `index_foreignkey_gallery_feed` (`feed_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+CREATE TABLE feed (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  term TEXT DEFAULT NULL,
+  archived INTEGER NOT NULL DEFAULT 0,
+  disabled INTEGER NOT NULL DEFAULT 0,
+  download INTEGER NOT NULL DEFAULT 1
+);
 
---
--- Table structure for table `gallery_tag`
---
+CREATE TABLE gallery (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  exhenid INTEGER DEFAULT NULL,
+  hash TEXT DEFAULT NULL,
+  name TEXT DEFAULT NULL,
+  added TEXT DEFAULT NULL,
+  archived INTEGER DEFAULT 0,
+  origtitle TEXT DEFAULT NULL,
+  type TEXT DEFAULT NULL,
+  posted TEXT DEFAULT NULL,
+  numfiles INTEGER DEFAULT NULL,
+  filesize INTEGER DEFAULT NULL,
+  deleted INTEGER DEFAULT 0,
+  lastaudit TEXT DEFAULT NULL,
+  updated TEXT DEFAULT NULL,
+  feed_id INTEGER DEFAULT NULL,
+  hasmeta INTEGER DEFAULT 0,
+  download INTEGER DEFAULT 1,
+  source INTEGER DEFAULT 0,
+  read INTEGER DEFAULT 0,
+  color TEXT DEFAULT 'black'
+);
+CREATE UNIQUE INDEX gallery_exhenid ON gallery (exhenid);
+CREATE INDEX gallery_feed ON gallery (feed_id);
+CREATE INDEX gallery_posted ON gallery (posted);
+CREATE INDEX gallery_added ON gallery (added);
 
-DROP TABLE IF EXISTS `gallery_tag`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `gallery_tag` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `gallery_id` int(11) unsigned DEFAULT NULL,
-  `namespace_id` int(11) unsigned DEFAULT NULL,
-  `tag_id` int(11) unsigned DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `index_foreignkey_gallery_tag_tagnamespace` (`namespace_id`),
-  KEY `index_foreignkey_gallery_tag_tag` (`tag_id`),
-  KEY `index_foreignkey_gallery_tag_gallery` (`gallery_id`),
-  CONSTRAINT `cons_fk_gallery_tag_gallery_id_id` FOREIGN KEY (`gallery_id`) REFERENCES `gallery` (`id`) ON DELETE SET NULL ON UPDATE SET NULL,
-  CONSTRAINT `cons_fk_gallery_tag_namespace_id_id` FOREIGN KEY (`namespace_id`) REFERENCES `tagnamespace` (`id`) ON DELETE SET NULL ON UPDATE SET NULL,
-  CONSTRAINT `cons_fk_gallery_tag_tag_id_id` FOREIGN KEY (`tag_id`) REFERENCES `tag` (`id`) ON DELETE SET NULL ON UPDATE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+CREATE TABLE tag (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT DEFAULT NULL
+);
+CREATE INDEX tag_name ON tag (name);
 
---
--- Table structure for table `gallery_thumb`
---
+CREATE TABLE tagnamespace (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT DEFAULT NULL,
+  similar_weight INTEGER DEFAULT 0
+);
+CREATE INDEX tagnamespace_name ON tagnamespace (name);
 
-DROP TABLE IF EXISTS `gallery_thumb`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `gallery_thumb` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `index` int(10) unsigned DEFAULT NULL,
-  `type` tinyint(4) DEFAULT NULL,
-  `gallery_id` int(11) unsigned DEFAULT NULL,
-  `image_id` int(11) unsigned DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `index_foreignkey_gallery_thumb_image` (`image_id`),
-  KEY `index_foreignkey_gallery_thumb_gallery` (`gallery_id`),
-  CONSTRAINT `cons_fk_gallery_thumb_gallery_id_id` FOREIGN KEY (`gallery_id`) REFERENCES `gallery` (`id`) ON DELETE SET NULL ON UPDATE SET NULL,
-  CONSTRAINT `cons_fk_gallery_thumb_image_id_id` FOREIGN KEY (`image_id`) REFERENCES `image` (`id`) ON DELETE SET NULL ON UPDATE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+CREATE TABLE gallery_tag (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  gallery_id INTEGER DEFAULT NULL REFERENCES gallery (id) ON DELETE SET NULL ON UPDATE SET NULL,
+  namespace_id INTEGER DEFAULT NULL REFERENCES tagnamespace (id) ON DELETE SET NULL ON UPDATE SET NULL,
+  tag_id INTEGER DEFAULT NULL REFERENCES tag (id) ON DELETE SET NULL ON UPDATE SET NULL
+);
+CREATE INDEX gallery_tag_gallery ON gallery_tag (gallery_id);
+CREATE INDEX gallery_tag_tag ON gallery_tag (tag_id);
 
---
--- Table structure for table `galleryproperty`
---
+CREATE TABLE image (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  width INTEGER DEFAULT NULL,
+  height INTEGER DEFAULT NULL,
+  type TEXT DEFAULT NULL,
+  filename TEXT DEFAULT NULL
+);
 
-DROP TABLE IF EXISTS `galleryproperty`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `galleryproperty` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) DEFAULT NULL,
-  `value` varchar(255) DEFAULT NULL,
-  `gallery_id` int(11) unsigned DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `index_foreignkey_galleryproperty_gallery` (`gallery_id`),
-  CONSTRAINT `cons_fk_galleryproperty_gallery_id_id` FOREIGN KEY (`gallery_id`) REFERENCES `gallery` (`id`) ON DELETE SET NULL ON UPDATE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+CREATE TABLE gallery_thumb (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  "index" INTEGER DEFAULT NULL,
+  type INTEGER DEFAULT NULL,
+  gallery_id INTEGER DEFAULT NULL REFERENCES gallery (id) ON DELETE SET NULL ON UPDATE SET NULL,
+  image_id INTEGER DEFAULT NULL REFERENCES image (id) ON DELETE SET NULL ON UPDATE SET NULL
+);
+CREATE INDEX gallery_thumb_gallery ON gallery_thumb (gallery_id);
+CREATE INDEX gallery_thumb_image ON gallery_thumb (image_id);
 
---
--- Table structure for table `image`
---
+CREATE TABLE galleryproperty (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT DEFAULT NULL,
+  value TEXT DEFAULT NULL,
+  gallery_id INTEGER DEFAULT NULL REFERENCES gallery (id) ON DELETE SET NULL ON UPDATE SET NULL
+);
+CREATE INDEX galleryproperty_gallery ON galleryproperty (gallery_id);
 
-DROP TABLE IF EXISTS `image`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `image` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `width` int(11) unsigned DEFAULT NULL,
-  `height` int(11) unsigned DEFAULT NULL,
-  `type` varchar(255) DEFAULT NULL,
-  `filename` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `sph_counter`
---
-
-DROP TABLE IF EXISTS `sph_counter`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `sph_counter` (
-  `counter_id` int(11) NOT NULL,
-  `last_updated` datetime NOT NULL,
-  PRIMARY KEY (`counter_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `tag`
---
-
-DROP TABLE IF EXISTS `tag`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `tag` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `tagnamespace`
---
-
-DROP TABLE IF EXISTS `tagnamespace`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `tagnamespace` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) DEFAULT NULL,
-  `similar_weight` tinyint(4) DEFAULT 0,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
+-- Full text search (classes/Search.php), one row per gallery (rowid = gallery.id), kept up to date when a
+-- gallery is stored. Filters and sorting use the gallery table. Contentless: the text is only in the
+-- index, not stored a second time.
+-- ":" belongs to words, so namespaced tags ("female:stockings") are one word; the parts of such words go
+-- into "parts" ("female", "stockings"), like the blended words of the former Manticore index.
+CREATE VIRTUAL TABLE gallery_fts USING fts5(
+  name, origtitle, type, exhenid, tags, parts,
+  content = '', contentless_delete = 1,
+  tokenize = "unicode61 tokenchars ':_'"
+);

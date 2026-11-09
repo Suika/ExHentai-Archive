@@ -104,7 +104,6 @@ class Task_Cleanup extends Task_Abstract {
                 $count++;
 			}
 			Log::debug(self::LOG_TAG, 'All galleries marked as deleted were deleted. Total deleted was %d', $count);
-            Search::requestReindex(true); // removed galleries need a full rebuild
 		}
 		else {
 			Log::debug(self::LOG_TAG, 'No galleries found that were marked as deleted.');

@@ -58,8 +58,6 @@ class Task_EditGallery extends Task_Abstract {
 
 		$cache = Cache::getInstance();
 		$cache->deleteObject('gallery', $gallery->id);
-
-		Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
 	}
 	
 }

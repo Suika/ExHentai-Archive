@@ -52,8 +52,6 @@ class Task_AddGallery extends Task_Abstract {
 			R::trash($gallery);
 			return;
 		}
-
-		Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
 	}
 	
 }

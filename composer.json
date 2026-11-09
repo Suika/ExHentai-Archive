@@ -9,7 +9,7 @@
         "ext-gd": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "ext-pdo_mysql": "*",
+        "ext-pdo_sqlite": "*",
         "ext-phar": "*",
         "ext-zip": "*",
         "gabordemooij/redbean": "^5.7",
