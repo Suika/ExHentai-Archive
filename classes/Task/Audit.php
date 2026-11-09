@@ -34,10 +34,7 @@ class Task_Audit extends Task_Abstract {
             }
         }
 
-        if(isset(Config::get()->indexer->full)) {
-            $command = Config::get()->indexer->full;
-            system($command);
-        }
+        Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
     }
 
     protected function audit($gallery) {

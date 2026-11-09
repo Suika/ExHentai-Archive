@@ -104,3 +104,13 @@ cd docker
 docker compose -f docker-compose.test.yml run --rm tests
 ```
 See [tests/README.md](../tests/README.md).
+
+Search index:
+- First start (no index in the sphinx volume): the indexes are built before the app starts.
+- Later starts: the app starts right away with the existing index; a full rebuild runs in the background
+  and replaces it when done.
+- Read/colour changes and deletions are applied to the search index immediately. Archive, Audit, AddGallery
+  and EditGallery request a partial update (only changed galleries) and Cleanup a full rebuild; a background
+  worker (`reindexer` in supervisord, `/reindexer.sh`) runs them one at a time. `REINDEX_POLL` (default 5)
+  is how often it checks, in seconds.
+- Request a full rebuild by hand: `docker exec exhen touch /var/www/exhen/tmp/reindex-full.request`

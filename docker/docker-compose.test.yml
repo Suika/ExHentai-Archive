@@ -37,6 +37,7 @@ services:
       - DB_PASS=exhen
       - EX_ACCESSKEY=test-key
       - EX_ALLOW_DELETE=1
+      - REINDEX_POLL=0.2
       - FAKE_EXHENTAI_URL=http://127.0.0.1:8090
       - FAKE_EXHENTAI_STATE=/var/tmp/fake-exhentai
       - UPDATE_SNAPSHOTS

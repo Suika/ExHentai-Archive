@@ -82,10 +82,8 @@ if ($task == "Full") {
     
     echo "<br>";
     
-    $command = Config::get()->indexer->full;
-    $output = "";
-    exec($command . " 2>&1", $output, $ret);
-    print_r($output);
+    Search::requestReindex(true);
+    echo "Full search index rebuild requested";
     
     echo "<br>";
 } else {

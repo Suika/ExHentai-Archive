@@ -23,7 +23,7 @@ Everything runs in Docker (`docker/docker-compose.test.yml`): a MariaDB containe
 ```sh
 cd docker
 docker compose -f docker-compose.test.yml build                      # after Dockerfile/composer/docker config changes
-docker compose -f docker-compose.test.yml run --rm tests             # all tests (~45 s)
+docker compose -f docker-compose.test.yml run --rm tests             # all tests (~1.5 min)
 docker compose -f docker-compose.test.yml run --rm tests --testsuite unit
 docker compose -f docker-compose.test.yml run --rm tests --filter ApiReadTest
 TEST_MARIADB=11.4 docker compose -f docker-compose.test.yml run --rm tests   # default is 10.3 (prod)
@@ -57,9 +57,7 @@ should pass once the bug is fixed; remove the `#[Group('known-bug')]` attribute 
 docker compose -f docker-compose.test.yml run --rm tests --group known-bug
 ```
 
-| Test | Bug |
-|---|---|
-| `ApiWriteTest::testReadFilterFollowsUpdateWithoutManualReindex` | B9: reindex started by the web request is never loaded by searchd |
+None at the moment.
 
 ## Fixtures
 

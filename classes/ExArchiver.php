@@ -126,10 +126,7 @@ class ExArchiver
         Log::debug(self::LOG_TAG, 'Archive complete. Archived %d galleries.', $archivedCount);
 
         if ($archivedCount > 0) {
-            if (isset(Config::get()->indexer->full)) {
-                $command = Config::get()->indexer->full;
-                system($command);
-            }
+            Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
         }
     }
 

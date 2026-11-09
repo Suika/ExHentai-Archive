@@ -334,6 +334,7 @@ class ApiHandler
             } else {
                 $gallery->deleted = 1;
                 R::store($gallery);
+                Search::updateAttributes($gallery->id, array('deleted' => 1));
 
                 $this->sendSuccess(true);
             }
@@ -406,8 +407,9 @@ class ApiHandler
     {
         header('Content-Type: text/plain');
 
-        $command = Config::get()->indexer->full;
-        system($command);
+        // runs in the background (docker/reindexer.sh); without a worker the command runs right here
+        Search::requestReindex(true);
+        echo "Reindex requested\n";
         exit;
     }
 
@@ -460,10 +462,8 @@ class ApiHandler
             $cache = Cache::getInstance();
             $cache->deleteObject('gallery', $gallery->id);
 
-            if (isset(Config::get()->indexer->full)) {
-                $command = Config::get()->indexer->full;
-                system($command);
-            }
+            // the read filter uses the search index: change it there right away instead of reindexing
+            Search::updateAttributes($gallery->id, array('read' => (string)$gallery->read));
 
             $this->sendSuccess($gallery->read);
         } else {
@@ -485,10 +485,7 @@ class ApiHandler
             $cache = Cache::getInstance();
             $cache->deleteObject('gallery', $gallery->id);
 
-            if (isset(Config::get()->indexer->full)) {
-                $command = Config::get()->indexer->full;
-                system($command);
-            }
+            Search::updateAttributes($gallery->id, array('color' => (string)$gallery->color));
 
             $this->sendSuccess($gallery->color);
         } else {

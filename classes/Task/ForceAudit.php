@@ -82,10 +82,7 @@ class Task_ForceAudit extends Task_Audit {
             $this->audit($gallery);
         }
 
-        if(isset(Config::get()->indexer->full)) {
-            $command = Config::get()->indexer->full;
-            system($command);
-        }
+        Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
     }
 
     // audit() and tagsDiff() are inherited from Task_Audit

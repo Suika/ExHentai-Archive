@@ -2,7 +2,6 @@
 
 namespace Tests\Integration;
 
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\Api;
 use Tests\Support\Db;
@@ -133,21 +132,23 @@ final class ApiWriteTest extends TestCase
         }
     }
 
-    #[Group('known-bug')]
-    public function testReadFilterFollowsUpdateWithoutManualReindex(): void
+    public function testFiltersFollowUpdatesWithoutReindex(): void
     {
-        // B9: the indexer started by the request (www-data) can't make the root searchd load the new index
+        // B9: read/colour are changed in the live search index right away (no indexing at all)
+        $runs = Stack::reindexHistory();
         Api::data('update', array('id' => $this->gallery, 'readStatus' => 1));
+        Api::data('updateColor', array('id' => $this->gallery, 'color' => 'red'));
 
-        $ids = array();
-        for ($i = 0; $i < 30; $i++) {
-            $ids = array_map(fn ($g) => (int)$g['id'], Api::data('galleries', array('read' => 1))['galleries']);
-            if ($ids) {
-                break;
-            }
-            usleep(100000);
-        }
+        $ids = fn ($params) => array_map(fn ($g) => (int)$g['id'], Api::data('galleries', $params)['galleries']);
+        $this->assertSame(array($this->gallery), $ids(array('read' => 1)));
+        $this->assertSame(array(), $ids(array('read' => 0)));
+        $this->assertSame(array($this->gallery), $ids(array('color' => 'red')));
+        usleep(500000);
+        $this->assertSame($runs, Stack::reindexHistory(), 'no reindex was requested');
+        $this->assertFileDoesNotExist(APP_ROOT.'/tmp/reindex-delta.request');
 
-        $this->assertSame(array($this->gallery), $ids);
+        // the database has the same values, so a later full rebuild keeps them
+        Stack::reindex();
+        $this->assertSame(array($this->gallery), $ids(array('read' => 1, 'color' => 'red')));
     }
 }

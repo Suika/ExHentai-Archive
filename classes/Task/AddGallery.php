@@ -53,10 +53,7 @@ class Task_AddGallery extends Task_Abstract {
 			return;
 		}
 
-		if(isset(Config::get()->indexer->full)) {
-			$command = Config::get()->indexer->full;
-    		system($command);
-    	}
+		Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
 	}
 	
 }

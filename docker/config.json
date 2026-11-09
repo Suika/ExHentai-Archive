@@ -23,7 +23,8 @@
             "user": "${DB_USER}"
         },
         "indexer": {
-            "full": "indexer --rotate galleries suggested"
+            "full": "indexer --rotate galleries suggested",
+            "triggerDir": "${EX_TEMPDIR}"
         },
         "memcache": {
             "host": "${MEMCACHED_HOST}",

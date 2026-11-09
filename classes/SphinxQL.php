@@ -43,6 +43,21 @@ class SphinxQL
         return $result;
     }
 
+    /**
+     * Runs a statement without a result (e.g. UPDATE) against the search daemon.
+     */
+    public static function exec($sql, $params = array())
+    {
+        self::getInstance();
+
+        R::selectDatabase('sphinx');
+        try {
+            return R::exec($sql, $params);
+        } finally {
+            R::selectDatabase('default');
+        }
+    }
+
     public static function getMeta()
     {
         self::getInstance();

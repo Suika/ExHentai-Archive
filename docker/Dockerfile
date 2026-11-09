@@ -64,7 +64,7 @@ RUN mkdir -p /var/www/exhen/images /var/www/exhen/tmp /var/www/exhen/archive /ru
     chown manticore:manticore -R /var/lib/sphinxsearch/data /run/manticore
 
 COPY docker/supervisord.conf /etc/supervisord.conf
-COPY docker/entrypoint.sh docker/config.json docker/manticore.conf docker/nginx.conf /
+COPY docker/entrypoint.sh docker/reindexer.sh docker/config.json docker/manticore.conf docker/nginx.conf /
 
 ENV DB_HOST=mariadb \
     DB_NAME=exhen \
