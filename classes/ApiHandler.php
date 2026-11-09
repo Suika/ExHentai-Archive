@@ -254,7 +254,6 @@ class ApiHandler
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_FAILONERROR, true);
-                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($ch, CURLOPT_MAXREDIRS, 300);
 
                     $cookie = Config::buildCookie();

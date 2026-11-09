@@ -109,11 +109,23 @@ final class AuditTaskTest extends TestCase
 
         $output = $this->runTask('Audit');
 
-        $this->assertStringContainsString('Gallery was either removed or was invalid', $output);
+        $this->assertStringContainsString('Gallery is unavailable: copyright claim by Irodori Comics', $output);
         $row = Db::gallery($this->id);
         $this->assertNotNull($row['lastaudit']);
         $this->assertSame('0', (string)$row['deleted']);
         $this->assertSame($tags, $this->tags(), 'tags are kept');
+        $this->assertSame(array('1', '1'), array((string)$row['archived'], (string)$row['download']),
+            'an archived gallery stays archived and listed by hasgallery');
+    }
+
+    public function testInvalidPageIsMarkedAudited(): void
+    {
+        Stack::fake()->galleryHtml(self::GID, '<html><body>Something went wrong</body></html>');
+
+        $output = $this->runTask('Audit');
+
+        $this->assertStringContainsString('Gallery was either removed or was invalid', $output);
+        $this->assertNotNull(Db::gallery($this->id)['lastaudit']);
     }
 
     public function testMissingGalleryIsMarkedAudited(): void

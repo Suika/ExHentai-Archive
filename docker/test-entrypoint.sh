@@ -8,7 +8,7 @@ cd /var/www/exhen
 
 # The fake ExHentai server replaces https://exhentai.org (ExClient "exhentai" config) and the request
 # throttle is disabled, so tasks never contact the real site and don't sleep.
-sed -i 's|"base": {|"base": {\n        "exhentai": {"baseUrl": "'"${FAKE_EXHENTAI_URL}"'", "throttle": 0},|' /config.json
+sed -i 's|"base": {|"base": {\n        "exhentai": {"baseUrl": "'"${FAKE_EXHENTAI_URL}"'", "throttle": 0, "downloadTimeout": 2},|' /config.json
 
 echo "Waiting for the database ${DB_HOST}"
 i=0

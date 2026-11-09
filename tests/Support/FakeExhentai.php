@@ -65,10 +65,14 @@ final class FakeExhentai
         return $this->save();
     }
 
-    /** "normal" or "credits" (POST returns "Insufficient Credits.") */
-    public function archiver(string $mode): self
+    /**
+     * "normal" or "credits" (POST returns "Insufficient Credits."), the latter for all galleries or only
+     * the given ones
+     */
+    public function archiver(string $mode, array $gids = array()): self
     {
         $this->state['archiver'] = $mode;
+        $this->state['creditsFor'] = array_map('intval', $gids);
         return $this->save();
     }
 
@@ -76,6 +80,13 @@ final class FakeExhentai
     public function archive(int $gid, array $entries): string
     {
         return ZipFactory::create(self::stateDir().'/archives/'.$gid.'.zip', $entries);
+    }
+
+    /** "normal", "missing" (HTTP 404) or "stall" (a few bytes, then nothing) for /archive/{gid}.zip */
+    public function zipMode(int $gid, string $mode): self
+    {
+        $this->state['zip'][(string)$gid] = $mode;
+        return $this->save();
     }
 
     /** Serves arbitrary bytes as /archive/{gid}.zip */

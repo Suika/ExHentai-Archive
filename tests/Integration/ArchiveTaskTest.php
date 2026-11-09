@@ -124,6 +124,101 @@ final class ArchiveTaskTest extends TestCase
         $result = $this->archive();
 
         $this->assertStringContainsString('Insufficient Credits', $result['output']);
+        $row = Db::galleryByExhenid(self::GID);
+        $this->assertSame('0', (string)$row['archived']);
+        $this->assertSame(array('[Momomimi] Pixiv [English]', '1'), array($row['name'], (string)$row['hasmeta']),
+            'the metadata is kept');
+    }
+
+    public function testInsufficientCreditsStopsTheRunGracefully(): void
+    {
+        // archived in exhenid order, highest first: 4302753 is downloaded, then the credits run out at 3654969
+        foreach (Stack::GALLERIES as $gid => $token) {
+            Stack::fake()->gallery($gid, "gallery-$gid.html");
+            Stack::fake()->archive($gid, ZipFactory::standardEntries());
+            Api::data('addgallery', array('gid' => $gid, 'token' => $token));
+        }
+        Stack::fake()->archiver('credits', array(3654969));
+        Db::exec("insert into feed (term, archived, disabled, download) values ('eng', 0, 0, 0)");
+        Stack::fake()->index(array('' => 'index-page.html', '4314775' => 'index-last.html'));
+
+        $result = $this->archive();
+
+        $this->assertStringContainsString('Insufficient Credits: stopped this run', $result['output']);
+        $this->assertSame('1', (string)Db::galleryByExhenid(4302753)['archived']);
+        $this->assertSame('0', (string)Db::galleryByExhenid(3654969)['archived']);
+        $this->assertSame(array(), $this->indexRequests(), 'no feed crawl after running out of credits');
+        $this->assertFileDoesNotExist(APP_ROOT.'/tmp/Task_Archive.pid', 'TaskRunner finished normally');
+
+        $ids = array_map(fn ($g) => (int)$g['id'], Api::data('galleries', array('search' => 'tomgirl'))['galleries']);
+        $this->assertSame(array((int)Db::galleryByExhenid(4302753)['id']), $ids,
+            'the gallery downloaded before is searchable (partial reindex ran)');
+        $this->assertSame('delta', array_slice(Stack::reindexHistory(), -1)[0]);
+    }
+
+    public function testCopyrightClaimUnqueuesTheGallery(): void
+    {
+        Fixtures::requireAll('gallery-copyright.html');
+        Stack::fake()->gallery(self::GID, 'gallery-copyright.html');
+        Api::data('addgallery', array('gid' => self::GID, 'token' => self::TOKEN));
+
+        $result = $this->archive();
+
+        $this->assertStringContainsString('unavailable: copyright claim by Irodori Comics', $result['output']);
+        $row = Db::galleryByExhenid(self::GID);
+        $this->assertSame(array('0', '0', '1'), array((string)$row['download'], (string)$row['archived'], (string)$row['hasmeta']));
+        $this->assertNull($row['name'], 'the error page is not taken as metadata');
+        $this->assertFileDoesNotExist(Stack::archivePath('pages/'.self::GID.'.html'), 'nor saved as the gallery page');
+        $this->assertCount(1, Stack::fake()->requests(), 'no archiver request');
+        $this->assertSame(array('exists' => false), Api::data('hasgallery', array('gid' => self::GID)),
+            'the userscript shows it as not queued');
+
+        Stack::fake()->clearRequests();
+        $this->archive();
+        $this->assertSame(array(), Stack::fake()->requests(), 'not fetched again by the next run');
+    }
+
+    public function testInvalidPageKeepsTheMetadata(): void
+    {
+        $this->queue();
+        $this->archive();
+        Db::exec('update gallery set hasmeta = 0 where exhenid = ?', array(self::GID)); // fetched again
+        Stack::fake()->galleryHtml(self::GID, '<html><body>Something went wrong</body></html>');
+
+        $result = $this->archive();
+
+        $this->assertStringContainsString('ExHentai returned no gallery page', $result['output']);
+        $row = Db::galleryByExhenid(self::GID);
+        $this->assertSame(array('[Momomimi] Pixiv [English]', '1', '1'),
+            array($row['name'], (string)$row['download'], (string)$row['archived']));
+        $this->assertNotEmpty(Api::data('gallery', array('id' => $row['id']))['tags']);
+    }
+
+    public function testDownloadErrorIsLogged(): void
+    {
+        $this->queue();
+        Stack::fake()->zipMode(self::GID, 'missing');
+
+        $result = $this->archive();
+
+        $this->assertMatchesRegularExpression('~Failed to download archive for gallery: .*: .*404 Not Found~', $result['output']);
+        $this->assertSame('0', (string)Db::galleryByExhenid(self::GID)['archived']);
+
+        Stack::fake()->zipMode(self::GID, 'normal');
+        $this->archive();
+        $this->assertSame('1', (string)Db::galleryByExhenid(self::GID)['archived'], 'the next run tries again');
+    }
+
+    public function testStalledDownloadTimesOut(): void
+    {
+        $this->queue();
+        Stack::fake()->zipMode(self::GID, 'stall');
+
+        $start = microtime(true);
+        $result = $this->archive();
+
+        $this->assertMatchesRegularExpression('~timed out after 2 s without data \(\d+ bytes received\)~', $result['output']);
+        $this->assertLessThan(15, microtime(true) - $start);
         $this->assertSame('0', (string)Db::galleryByExhenid(self::GID)['archived']);
     }
 

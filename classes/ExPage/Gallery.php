@@ -8,6 +8,25 @@ class ExPage_Gallery extends ExPage_Abstract
         return count($result) >= 3;
     }
 
+    /**
+     * @return string|null who claimed the gallery, when ExHentai shows "This gallery is unavailable due to a
+     *                     copyright claim by <holder>."
+     */
+    public function getCopyrightClaim()
+    {
+        // the holder is the rest of the sentence, which ends the line ("... by Irodori Comics.<br />Sorry ...")
+        foreach ($this->find('p') as $p) {
+            foreach ($p->childNodes as $node) {
+                if ($node->nodeType === XML_TEXT_NODE
+                    && preg_match('/unavailable due to a copyright claim by (.+?)\.?\s*$/is', $node->textContent, $matches)) {
+                    return trim(preg_replace('/\s+/', ' ', $matches[1]));
+                }
+            }
+        }
+
+        return null;
+    }
+
     public function getName()
     {
         return self::text($this->find('h1#gn'));

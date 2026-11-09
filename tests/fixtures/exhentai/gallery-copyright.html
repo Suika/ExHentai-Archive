@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Gallery Not Available - ExHentai.org</title>
+<link rel="stylesheet" type="text/css" href="https://exhentai.org/z/0381/x.css" />
+</head>
+<body>
+<script type="text/javascript">
+function popUp(URL,w,h) {
+	window.open(URL,"_pu"+(Math.random()+"").replace(/0\./,""),"toolbar=0,scrollbars=0,location=0,statusbar=0,menubar=0,resizable=0,width="+w+",height="+h+",left="+((screen.width-w)/2)+",top="+((screen.height-h)/2));
+	return false;
+}
+</script>
+<div class="d">
+<p>This gallery is unavailable due to a copyright claim by Irodori Comics.<br />Sorry about that.</p>
+<p>You will be redirected to the front page momentarily.</p>
+<p id="continue"><a href="https://exhentai.org/">(Click here to continue)</a></p>
+</div>
+
+<script type="text/javascript">
+function gotonext() {
+	document.getElementById("continue").innerHTML = "Please wait...";
+	document.location = "https://exhentai.org/";
+}
+setTimeout("gotonext()", 3000);
+</script>
+
+</body>
+</html>

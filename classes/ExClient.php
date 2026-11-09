@@ -95,7 +95,6 @@ class ExClient
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_FAILONERROR, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_MAXREDIRS, 300);
 
         $cookie = Config::buildCookie();
@@ -132,7 +131,6 @@ class ExClient
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_FAILONERROR, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 
             $cookie = Config::buildCookie();
             curl_setopt($ch, CURLOPT_COOKIE, $cookie);
@@ -155,7 +153,6 @@ class ExClient
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_FAILONERROR, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         
         $cookie = Config::buildCookie();
         curl_setopt($ch, CURLOPT_COOKIE, $cookie);

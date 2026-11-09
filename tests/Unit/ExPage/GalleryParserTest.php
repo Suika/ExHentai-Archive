@@ -28,6 +28,7 @@ final class GalleryParserTest extends TestCase
             'properties' => $page->getProperties(),
             'archiverUrl' => $page->getArchiverUrl(),
             'newestVersion' => $newest ? (array)$newest : $newest,
+            'copyrightClaim' => $page->getCopyrightClaim(),
         );
     }
 
@@ -91,6 +92,16 @@ final class GalleryParserTest extends TestCase
         $this->assertFalse($page->isValid());
         $this->assertFalse($page->getNewestVersion());
         $this->assertFalse($page->getArchiverUrl());
+    }
+
+    public function testCopyrightClaim(): void
+    {
+        $this->assertSame('Irodori Comics', (new \ExPage_Gallery(Fixtures::html('gallery-copyright.html')))->getCopyrightClaim());
+        $this->assertSame('Some Publisher Inc', (new \ExPage_Gallery(
+            '<div class="d"><p>This gallery is unavailable due to a copyright claim by Some Publisher Inc.<br />Sorry about that.</p></div>'
+        ))->getCopyrightClaim());
+        $this->assertNull((new \ExPage_Gallery(Fixtures::html('gallery-4302753.html')))->getCopyrightClaim());
+        $this->assertNull((new \ExPage_Gallery('Key missing, or incorrect key provided.'))->getCopyrightClaim());
     }
 
     public function testEmptyResponse(): void

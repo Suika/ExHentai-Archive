@@ -56,7 +56,12 @@ class Task_Audit extends Task_Abstract {
             $gallery->lastaudit = date('Y-m-d H:i:s'); //gallery was probably deleted, so mark it as audited for now
             R::store($gallery);
 
-            Log::error(static::LOG_TAG, 'Gallery was either removed or was invalid.');
+            $claim = $galleryPage->getCopyrightClaim();
+            if ($claim !== null) {
+                Log::error(static::LOG_TAG, 'Gallery is unavailable: copyright claim by %s', $claim);
+            } else {
+                Log::error(static::LOG_TAG, 'Gallery was either removed or was invalid.');
+            }
             return;
         }
 

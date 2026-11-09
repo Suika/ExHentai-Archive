@@ -9,6 +9,12 @@ class ExArchiver
     protected $config;
     protected $cache;
 
+    /** set when ExHentai answers "Insufficient Credits.": no further downloads in this run */
+    protected $outOfCredits = false;
+
+    /** galleries whose search data changed in this run (downloaded or new metadata) */
+    protected $changedCount = 0;
+
     public function __construct()
     {
         $this->client = new ExClient();
@@ -34,6 +40,10 @@ class ExArchiver
         //archive unarchived galleries
         $unarchived = R::find('gallery', '((archived = 0 and download = 1) or hasmeta = 0) and deleted = 0 and source = 0 ORDER BY exhenid DESC');
         foreach ($unarchived as $gallery) {
+            if ($this->outOfCredits) {
+                break;
+            }
+
             $this->archiveGallery($gallery);
 
             if ($gallery->archived) {
@@ -42,13 +52,18 @@ class ExArchiver
         }
 
         //run through feeds and add new galleries
-        if ($forced_feed == false) {
+        if ($this->outOfCredits) {
+            $feeds = array(); // stop this run; the galleries are tried again next time
+        } elseif ($forced_feed == false) {
             $feeds = R::find('feed', 'disabled = 0');
         } else {
             $feeds = R::find('feed', 'disabled = 0 and id = :id', [':id' => $forced_feed]);
         }
 
         foreach ($feeds as $feed) {
+            if ($this->outOfCredits) {
+                break;
+            }
             $page = 0;
             $next = null;      // ExHentai pages search results with a cursor (?next=<gid>)
             $seen = array();
@@ -94,6 +109,10 @@ class ExArchiver
                             }
                         }
 
+                        if ($this->outOfCredits) {
+                            break;
+                        }
+
                         if ((!$gallery->archived && $gallery->download) || !$gallery->hasmeta) {
                             $this->archiveGallery($gallery);
 
@@ -109,7 +128,7 @@ class ExArchiver
                     R::store($feed);
                 }
 
-                if ($isLastPage || $hasGallery) {
+                if ($isLastPage || $hasGallery || $this->outOfCredits) {
                     break;
                 }
 
@@ -123,9 +142,13 @@ class ExArchiver
             }
         }
 
+        if ($this->outOfCredits) {
+            Log::error(self::LOG_TAG, 'Insufficient Credits: stopped this run, the remaining galleries are tried again next time');
+        }
+
         Log::debug(self::LOG_TAG, 'Archive complete. Archived %d galleries.', $archivedCount);
 
-        if ($archivedCount > 0) {
+        if ($archivedCount > 0 || $this->changedCount > 0) {
             Search::requestReindex(); // changed galleries only, in the background (docker/reindexer.sh)
         }
     }
@@ -143,6 +166,23 @@ class ExArchiver
         }
 
         $galleryPage = new ExPage_Gallery($galleryHtml);
+
+        // error pages (copyright claim, removed gallery) must not replace the stored metadata
+        if (!$galleryPage->isValid()) {
+            $claim = $galleryPage->getCopyrightClaim();
+            if ($claim !== null) {
+                Log::error(self::LOG_TAG, 'Gallery #%d unavailable: copyright claim by %s', $gallery->exhenid, $claim);
+                if (!$gallery->archived) {
+                    // can't be downloaded anymore: unqueue it (the userscript can queue it again)
+                    $gallery->download = false;
+                    $gallery->hasmeta = true;
+                    R::store($gallery);
+                }
+            } else {
+                Log::error(self::LOG_TAG, 'Gallery #%d: ExHentai returned no gallery page (removed or invalid)', $gallery->exhenid);
+            }
+            return;
+        }
 
         // save html
         $pagesFile = sprintf('%s/pages/%d.html', $this->config->archiveDir, $gallery->exhenid);
@@ -164,6 +204,7 @@ class ExArchiver
         $gallery->addProperties($props);
 
         $gallery->hasmeta = true;
+        $this->changedCount++;
 
         if ($gallery->download) {
             //delete if gallery zip exists (it shouldn't)
@@ -178,14 +219,17 @@ class ExArchiver
             $archiverUrl = $galleryPage->getArchiverUrl();
             if (!$archiverUrl) {
                 Log::error(self::LOG_TAG, 'Failed to find archiver link for gallery: %s (#%d)', $gallery->name, $gallery->exhenid);
+                R::store($gallery);
                 return;
             }
 
             $buttonPress = $this->client->buttonPress($archiverUrl);
 
             if (strpos($buttonPress, 'Insufficient Credits.') !== false) {
-                Log::error(self::LOG_TAG, 'Insufficient Credits');
-                exit;
+                Log::error(self::LOG_TAG, 'Insufficient Credits for gallery: %s (#%d)', $gallery->name, $gallery->exhenid);
+                $this->outOfCredits = true;
+                R::store($gallery); // keep the metadata
+                return;
             }
 
             $archiverPage = new ExPage_Archiver($buttonPress);
@@ -197,10 +241,9 @@ class ExArchiver
                     $continueUrl = preg_replace('/\?.*/', '', $continueUrl);
                 }
                 $archiveDownloadUrl = $continueUrl.'?start=1';
-                $arrRequestHeaders = array( "ssl"=>array( "verify_peer"=>false, "verify_peer_name"=>false, ) );
-                $ret = @copy($archiveDownloadUrl, $targetFile, stream_context_create($arrRequestHeaders));
+                $error = $this->download($archiveDownloadUrl, $targetFile);
 
-                if ($ret) {
+                if ($error === null) {
                     $archive = new ZipArchive();
                     $ret = $archive->open($targetFile);
                     if ($ret === true && $archive->status == ZipArchive::ER_OK) {
@@ -213,7 +256,7 @@ class ExArchiver
                         Log::error(self::LOG_TAG, 'Downloaded file is not an archive for gallery: %s (#%d)', $gallery->name, $gallery->exhenid);
                     }
                 } else {
-                    Log::error(self::LOG_TAG, 'Failed to download archive for gallery: %s (#%d)', $gallery->name, $gallery->exhenid);
+                    Log::error(self::LOG_TAG, 'Failed to download archive for gallery: %s (#%d): %s', $gallery->name, $gallery->exhenid, $error);
                 }
             } else {
                 Log::error(self::LOG_TAG, 'Failed to find archive link for gallery: %s (#%d) - low GP?', $gallery->name, $gallery->exhenid);
@@ -221,5 +264,43 @@ class ExArchiver
         }
 
         R::store($gallery);
+    }
+
+    /**
+     * Downloads $url to $targetFile (one attempt; a failed download is tried again by a later run).
+     * Gives up when no data arrives for "exhentai.downloadTimeout" seconds (default 120).
+     *
+     * @return string|null null on success, otherwise what went wrong (HTTP status, SSL/connection error, timeout)
+     */
+    protected function download($url, $targetFile)
+    {
+        $timeout = (int)($this->config->exhentai->downloadTimeout ?? 120);
+        $context = stream_context_create(array(
+            'http' => array('timeout' => $timeout, 'follow_location' => 1, 'ignore_errors' => false),
+        ));
+
+        error_clear_last();
+        $in = @fopen($url, 'rb', false, $context);
+        if (!$in) {
+            $error = error_get_last();
+            $message = $error ? $error['message'] : 'unknown error';
+            // "fopen(https://...): Failed to open stream: HTTP request failed! HTTP/1.1 404 Not Found"
+            return preg_replace('~^fopen\([^)]*\): ~', '', $message);
+        }
+
+        $out = fopen($targetFile, 'wb');
+        $bytes = stream_copy_to_stream($in, $out);
+        $meta = stream_get_meta_data($in);
+        fclose($out);
+        fclose($in);
+
+        if (!empty($meta['timed_out'])) {
+            return sprintf('timed out after %d s without data (%d bytes received)', $timeout, (int)$bytes);
+        }
+        if ($bytes === false) {
+            return 'reading the download failed';
+        }
+
+        return null;
     }
 }

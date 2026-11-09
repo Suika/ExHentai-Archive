@@ -13,6 +13,7 @@
  *   /archiver.php  POST      result page with the #continue link, rewritten to /archive/{gid}.zip
  *                            ("Insufficient Credits." when state "archiver" is "credits")
  *   /archive/{gid}.zip       the gallery archive from $FAKE_EXHENTAI_STATE/archives/{gid}.zip
+ *                            (state "zip": gid => "missing" for a 404, "stall" for a download that stops)
  *
  * The archiver pages use tests/fixtures/exhentai/archiver-form.html / archiver-continue.html when they exist,
  * otherwise a minimal page with the same elements the app looks for.
@@ -81,7 +82,8 @@ if ($path === '/archiver.php') {
     $gid = (int)($_GET['gid'] ?? 0);
 
     if ($method === 'POST') {
-        if (($state['archiver'] ?? '') === 'credits') {
+        $noCreditsFor = $state['creditsFor'] ?? array();
+        if (($state['archiver'] ?? '') === 'credits' && (!$noCreditsFor || in_array($gid, $noCreditsFor))) {
             send('<html><body><p>Insufficient Credits.</p></body></html>');
         }
 
@@ -108,8 +110,18 @@ if ($path === '/archiver.php') {
 // gallery archive
 if (preg_match('~^/archive/(\d+)\.zip$~', $path, $m)) {
     $file = $stateDir.'/archives/'.$m[1].'.zip';
-    if (!is_file($file)) {
+    $mode = $state['zip'][$m[1]] ?? 'normal';
+    if (!is_file($file) || $mode === 'missing') {
         send('not found', 404, 'text/plain');
+    }
+    if ($mode === 'stall') {
+        // sends the headers and a few bytes, then nothing (a stalled H@H node)
+        header('Content-Type: application/zip');
+        header('Content-Length: '.filesize($file));
+        echo substr(file_get_contents($file), 0, 100);
+        flush();
+        sleep(5);
+        exit;
     }
 
     header('Content-Type: application/zip');
