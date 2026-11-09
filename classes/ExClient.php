@@ -44,9 +44,21 @@ class ExClient
         }
     }
 
-    public function index($search = '', $page = 0, $extraParams = array())
+    /**
+     * Categories ExHentai's f_cats filter leaves out (a bit set). Searches only list Doujinshi and Manga:
+     * Misc 1, Artist CG 8, Game CG 16, Image Set 32, Cosplay 64, Asian Porn 128, Non-H 256, Western 512.
+     */
+    const SEARCH_EXCLUDED_CATEGORIES = 1017;
+
+    /**
+     * A search result page. $next is the cursor of the page (ExPage_Index::getNextCursor()), null for the first.
+     */
+    public function index($search = '', $next = null, $extraParams = array())
     {
-        $params = array('page' => $page);
+        $params = array();
+        if ($next !== null && $next !== '') {
+            $params['next'] = $next;
+        }
 
         if (is_array($extraParams)) {
             $params = array_merge($params, $extraParams);
@@ -54,11 +66,7 @@ class ExClient
 
         if ($search) {
             $params = array_merge($params, array( //todo - move to config
-                'f_doujinshi' => 1,
-                'f_manga' => 1,
-                'f_artistcg' => 0,
-                'f_gamecg' => 0,
-                'f_non-h' => 0,
+                'f_cats' => self::SEARCH_EXCLUDED_CATEGORIES,
                 'f_search' => $search
             ));
         }

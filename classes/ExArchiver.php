@@ -50,6 +50,8 @@ class ExArchiver
 
         foreach ($feeds as $feed) {
             $page = 0;
+            $next = null;      // ExHentai pages search results with a cursor (?next=<gid>)
+            $seen = array();
 
             while (true) {
                 Log::debug(self::LOG_TAG, 'Crawling feed "%s", page %d', $feed->term, $page);
@@ -57,10 +59,10 @@ class ExArchiver
                 $params = array();
 
                 if ($feed->expunged) {
-                    $params['f_sh'] = 1;
+                    $params['f_sh'] = 'on';
                 }
 
-                $indexHtml = $this->client->index($feed->term, $page, $params);
+                $indexHtml = $this->client->index($feed->term, $next, $params);
                 $indexPage = new ExPage_Index($indexHtml);
 
                 $isLastPage = $indexPage->isLastPage();
@@ -82,7 +84,7 @@ class ExArchiver
                             $gallery->download = $feed->download;
                             R::store($gallery);
                         } else {
-                            if ($gallery->feed == $feed && $feed->archived) {
+                            if ($gallery->feed_id == $feed->id && $feed->archived) { // compare ids: two loaded beans are never ==
                                 $hasGallery = true;
                             }
 
@@ -111,6 +113,12 @@ class ExArchiver
                     break;
                 }
 
+                $next = $indexPage->getNextCursor();
+                if (isset($seen[$next])) {
+                    Log::error(self::LOG_TAG, 'Feed "%s": page %s was already crawled, stopping', $feed->term, $next);
+                    break;
+                }
+                $seen[$next] = true;
                 $page++;
             }
         }

@@ -2,7 +2,6 @@
 
 namespace Tests\Integration;
 
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\Api;
 use Tests\Support\Db;
@@ -160,18 +159,60 @@ final class ArchiveTaskTest extends TestCase
         $this->assertSame('5600000000', (string)Api::data('stats')['filesize']);
     }
 
-    #[Group('known-bug')]
+    private function feed(): array
+    {
+        Db::exec("insert into feed (term, archived, disabled, download) values ('eng', 0, 0, 0)");
+        Stack::fake()->index(array('' => 'index-page.html', '4314775' => 'index-last.html'));
+
+        return $this->archive();
+    }
+
+    private function indexRequests(): array
+    {
+        $uris = array_map(fn ($r) => $r['uri'], Stack::fake()->requests());
+        return array_values(array_filter($uris, fn ($u) => strpos($u, '/?') === 0));
+    }
+
     public function testFeedCrawl(): void
     {
-        // Current ExHentai search pages (Compact view, cursor pagination) are not understood by ExPage_Index,
-        // see Tests\Unit\ExPage\IndexParserTest
-        Fixtures::requireAll('index-page.html', 'index-last.html');
-        Db::exec("insert into feed (term, archived, disabled, download) values ('eng', 0, 0, 0)");
-        Stack::fake()->index(array('index-page.html', 'index-last.html'));
+        $this->feed();
+
+        $this->assertSame(50, Db::count('gallery', 'feed_id = 1'), 'the galleries of both result pages were added');
+        $this->assertSame('[Yaki Karubi] Jikan Teishi! Akuyou Chuui♡ / Time Stop! Don\'t Misuse It ♡ [English] {Doujins.com}',
+            Db::galleryByExhenid(4315338)['name']);
+        $this->assertSame('0', (string)Db::galleryByExhenid(4315338)['download'], 'feed without download: metadata only');
+        $this->assertSame('1', (string)Db::value('select archived from feed'), 'the feed reached its last page');
+
+        $this->assertSame(array(
+            '/?f_cats=1017&f_search=eng',
+            '/?next=4314775&f_cats=1017&f_search=eng',
+        ), $this->indexRequests(), 'cursor paging, Doujinshi and Manga only');
+    }
+
+    public function testCrawledFeedStopsAtKnownGalleries(): void
+    {
+        $this->feed();
+        Stack::fake()->clearRequests();
 
         $this->archive();
 
-        $this->assertGreaterThan(0, Db::count('gallery', 'feed_id is not null'), 'galleries of the feed were added');
-        $this->assertSame('1', (string)Db::value('select archived from feed'), 'the feed reached its last page');
+        $this->assertSame(array('/?f_cats=1017&f_search=eng'), $this->indexRequests(),
+            'a completely crawled feed only checks its first page for new galleries');
+        $this->assertSame(50, Db::count('gallery', 'feed_id = 1'));
+    }
+
+    public function testFeedDownloadsNewGalleries(): void
+    {
+        Db::exec("insert into feed (term, archived, disabled, download) values ('eng', 0, 0, 1)");
+        $page = '<table class="itg gltc"><tr><td class="gl3c glname"><a href="https://exhentai.org/g/'.self::GID.'/'.self::TOKEN.'/">'
+            .'<div class="glink">[Momomimi] Pixiv [English]</div></a></td></tr></table><div class="searchnav"><span id="dnext">Next</span></div>';
+        Stack::fake()->gallery(self::GID, 'gallery-'.self::GID.'.html');
+        Stack::fake()->archive(self::GID, ZipFactory::standardEntries());
+        Stack::fake()->indexHtml($page);
+
+        $this->archive();
+
+        $row = Db::galleryByExhenid(self::GID);
+        $this->assertSame(array('1', '1', '1'), array((string)$row['feed_id'], (string)$row['download'], (string)$row['archived']));
     }
 }

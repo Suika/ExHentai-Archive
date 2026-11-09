@@ -7,7 +7,8 @@
  * by the tests through $FAKE_EXHENTAI_STATE/state.json (see Tests\Support\FakeExhentai):
  *
  *   /g/{gid}/{token}/        gallery page: fixture from state "galleries", 404 for unknown galleries
- *   /?page=N&...             feed index page N: fixture from state "index" (list, by page number)
+ *   /?next=N&...             search result page with cursor N (first page: no next): fixture from state "index"
+ *                            (cursor => fixture, "" for the first page)
  *   /archiver.php  GET       archiver page with the "dlcheck" form
  *   /archiver.php  POST      result page with the #continue link, rewritten to /archive/{gid}.zip
  *                            ("Insufficient Credits." when state "archiver" is "credits")
@@ -119,8 +120,11 @@ if (preg_match('~^/archive/(\d+)\.zip$~', $path, $m)) {
 
 // feed index (front page search)
 if ($path === '/' || $path === '') {
-    $page = (int)($_GET['page'] ?? 0);
-    $name = $state['index'][$page] ?? null;
+    if (isset($state['indexHtml'])) {
+        send($state['indexHtml']);
+    }
+
+    $name = $state['index'][(string)($_GET['next'] ?? '')] ?? null;
     if ($name === null) {
         send('<html><body><p>No hits found</p></body></html>');
     }

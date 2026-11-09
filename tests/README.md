@@ -59,7 +59,6 @@ docker compose -f docker-compose.test.yml run --rm tests --group known-bug
 
 | Test | Bug |
 |---|---|
-| `IndexParserTest::testPageWithNextPage`, `testLastPage`, `ArchiveTaskTest::testFeedCrawl` | feed crawl doesn't understand current ExHentai search pages (Compact view, `?next=` pagination) |
 | `ApiWriteTest::testReadFilterFollowsUpdateWithoutManualReindex` | B9: reindex started by the web request is never loaded by searchd |
 
 ## Fixtures
@@ -71,7 +70,7 @@ docker compose -f docker-compose.test.yml run --rm tests --group known-bug
 | `gallery-<gid>.html` | gallery pages (every `gallery-*.html` gets a parser snapshot) |
 | `gallery-newer.html`, `gallery-newer-older.html` | galleries with a "newer version" link (one and two newer versions) |
 | `gallery-removed.html` | page shown for a removed gallery |
-| `index-page.html`, `index-last.html` | search result page with a next page, and the last page |
+| `index-page.html`, `index-last.html` | search result page with a next page, and the last page (any list view works, these are Compact) |
 | `archiver-form.html`, `archiver-continue.html` | archiver.php: the download form, and the page after "Download Original Archive" |
 
 Saved pages contain account data. **Always run them through the sanitizer before adding them:**

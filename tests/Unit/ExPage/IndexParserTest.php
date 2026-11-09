@@ -2,17 +2,13 @@
 
 namespace Tests\Unit\ExPage;
 
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\Fixtures;
 use Tests\Support\Snapshot;
 
 /**
- * Feed (front page search) parsing: ExPage_Index, used by the Archive task.
- *
- * Known bug: the fixtures are current ExHentai search pages (Compact list view "itg gltc", cursor
- * pagination "?next=<gid>" with #dnext). ExPage_Index only knows the old Thumbnail grid (.itg.gld .gl1t)
- * and the old numbered pager (td.ptds + td.ptdd), so it finds no galleries and never sees the last page.
+ * Search result page parsing (ExPage_Index), used by the feed crawl of the Archive task.
+ * The fixtures are current ExHentai search pages in the Compact list view with cursor paging.
  */
 final class IndexParserTest extends TestCase
 {
@@ -22,17 +18,23 @@ final class IndexParserTest extends TestCase
 
         return array(
             'isLastPage' => $page->isLastPage(),
+            'nextCursor' => $page->getNextCursor(),
             'galleries' => array_map(fn ($g) => (array)$g, $page->getGalleries()),
         );
     }
 
-    #[Group('known-bug')]
     public function testPageWithNextPage(): void
     {
         $data = self::extract(Fixtures::html('index-page.html'));
 
         $this->assertFalse($data['isLastPage']);
-        $this->assertNotEmpty($data['galleries']);
+        $this->assertSame('4314775', $data['nextCursor']);
+        $this->assertCount(25, $data['galleries']);
+        $this->assertSame(array(
+            'name' => "[Yaki Karubi] Jikan Teishi! Akuyou Chuui♡ / Time Stop! Don't Misuse It ♡ [English] {Doujins.com}",
+            'exhenid' => '4315338',
+            'hash' => '5952c385d2',
+        ), $data['galleries'][0], 'the title without the tags shown in the same link');
         foreach ($data['galleries'] as $gallery) {
             $this->assertMatchesRegularExpression('/^\d+$/', $gallery['exhenid']);
             $this->assertMatchesRegularExpression('/^[0-9a-f]+$/', $gallery['hash']);
@@ -42,15 +44,42 @@ final class IndexParserTest extends TestCase
         Snapshot::assertMatches('parser/index-page', $data);
     }
 
-    #[Group('known-bug')]
     public function testLastPage(): void
     {
         $data = self::extract(Fixtures::html('index-last.html'));
 
         $this->assertTrue($data['isLastPage']);
-        $this->assertNotEmpty($data['galleries']);
+        $this->assertNull($data['nextCursor']);
+        $this->assertCount(25, $data['galleries']);
 
         Snapshot::assertMatches('parser/index-last', $data);
+    }
+
+    public function testThumbnailView(): void
+    {
+        // shape of the Thumbnail list view: a cover link and a title link per gallery
+        $html = '<div class="itg gld">'
+            .'<div class="gl1t"><a href="https://exhentai.org/g/11/aaaa/"><div class="gl3t"><img src="x.webp"></div></a>'
+            .'<a href="https://exhentai.org/g/11/aaaa/"><div class="glink">First Title</div></a></div>'
+            .'<div class="gl1t"><a href="https://exhentai.org/g/12/bbbb/"><div class="glink">Second Title</div></a></div>'
+            .'</div><div class="searchnav"><a id="dnext" href="https://exhentai.org/?f_search=x&amp;next=12">Next</a></div>';
+
+        $data = self::extract($html);
+
+        $this->assertSame(array(
+            array('name' => 'First Title', 'exhenid' => '11', 'hash' => 'aaaa'),
+            array('name' => 'Second Title', 'exhenid' => '12', 'hash' => 'bbbb'),
+        ), $data['galleries']);
+        $this->assertSame('12', $data['nextCursor']);
+    }
+
+    public function testLinksOutsideTheListAreIgnored(): void
+    {
+        // e.g. a gallery page has /g/ links (versions, parent) but no result list
+        $data = self::extract(Fixtures::html('gallery-newer.html'));
+
+        $this->assertSame(array(), $data['galleries']);
+        $this->assertTrue($data['isLastPage']);
     }
 
     public function testNoHits(): void
@@ -58,5 +87,6 @@ final class IndexParserTest extends TestCase
         $data = self::extract('<html><body><p>No hits found</p></body></html>');
 
         $this->assertSame(array(), $data['galleries']);
+        $this->assertTrue($data['isLastPage'], 'an empty or error page ends the crawl');
     }
 }

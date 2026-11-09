@@ -51,10 +51,17 @@ final class FakeExhentai
         return $this->save();
     }
 
-    /** @param string[] $fixtures index page fixture per page number */
+    /** @param array<string,string> $fixtures search page fixture per "next" cursor ("" = first page) */
     public function index(array $fixtures): self
     {
-        $this->state['index'] = array_values($fixtures);
+        $this->state['index'] = $fixtures;
+        return $this->save();
+    }
+
+    /** Serves the given HTML as the only search result page */
+    public function indexHtml(string $html): self
+    {
+        $this->state['indexHtml'] = $html;
         return $this->save();
     }
 
