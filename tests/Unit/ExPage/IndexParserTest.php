@@ -57,20 +57,22 @@ final class IndexParserTest extends TestCase
 
     public function testThumbnailView(): void
     {
-        // shape of the Thumbnail list view: a cover link and a title link per gallery
-        $html = '<div class="itg gld">'
-            .'<div class="gl1t"><a href="https://exhentai.org/g/11/aaaa/"><div class="gl3t"><img src="x.webp"></div></a>'
-            .'<a href="https://exhentai.org/g/11/aaaa/"><div class="glink">First Title</div></a></div>'
-            .'<div class="gl1t"><a href="https://exhentai.org/g/12/bbbb/"><div class="glink">Second Title</div></a></div>'
-            .'</div><div class="searchnav"><a id="dnext" href="https://exhentai.org/?f_search=x&amp;next=12">Next</a></div>';
+        // a real search page in the Thumbnail list view: a title link and a cover link per gallery
+        $data = self::extract(Fixtures::html('index-thumbnail.html'));
 
-        $data = self::extract($html);
-
+        $this->assertFalse($data['isLastPage']);
+        $this->assertSame('4307766', $data['nextCursor']);
+        $this->assertCount(100, $data['galleries']);
         $this->assertSame(array(
-            array('name' => 'First Title', 'exhenid' => '11', 'hash' => 'aaaa'),
-            array('name' => 'Second Title', 'exhenid' => '12', 'hash' => 'bbbb'),
-        ), $data['galleries']);
-        $this->assertSame('12', $data['nextCursor']);
+            'name' => '[sakidesu-zrkc] [導入/セリフ差分５枚]搾精魔女コス里沙と…',
+            'exhenid' => '4316052',
+            'hash' => 'dd1f8b2c58',
+        ), $data['galleries'][0]);
+        foreach ($data['galleries'] as $gallery) {
+            $this->assertNotSame('', trim($gallery['name']));
+        }
+
+        Snapshot::assertMatches('parser/index-thumbnail', $data);
     }
 
     public function testLinksOutsideTheListAreIgnored(): void
