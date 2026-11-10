@@ -14,6 +14,7 @@
  *                            ("Insufficient Credits." when state "archiver" is "credits")
  *   /archive/{gid}.zip       the gallery archive from $FAKE_EXHENTAI_STATE/archives/{gid}.zip
  *                            (state "zip": gid => "missing" for a 404, "stall" for a download that stops)
+ *   /thumb/{name}.jpg        a gallery cover: a small JPEG; "missing" is a 404, "hang" never answers (15 s)
  *
  * The archiver pages use tests/fixtures/exhentai/archiver-form.html / archiver-continue.html when they exist,
  * otherwise a minimal page with the same elements the app looks for.
@@ -137,6 +138,21 @@ if ($path === '/archiver.php') {
     }
 
     send($html);
+}
+
+// gallery cover (exgallerythumb)
+if (preg_match('~^/thumb/(\w+)\.jpg$~', $path, $m)) {
+    if ($m[1] === 'missing') {
+        send('not found', 404, 'text/plain');
+    }
+    if ($m[1] === 'hang') {
+        sleep(15);
+        exit;
+    }
+    $im = imagecreatetruecolor(20, 30);
+    ob_start();
+    imagejpeg($im);
+    send(ob_get_clean(), 200, 'image/jpeg');
 }
 
 // gallery archive

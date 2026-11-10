@@ -217,32 +217,42 @@ class ApiHandler
                 $pageFile = sprintf('%s/pages/%d.html', $config->archiveDir, $gallery->exhenid);
 
                 if (file_exists($pageFile)) {
-                    header('Content-Type: image/jpeg');
-                    header('Last-Modified: '.gmdate('D, d M Y H:i:s', strtotime($gallery->posted)).' GMT');
-                    header('Expires: '.gmdate('D, d M Y H:i:s', strtotime('+1 year')).' GMT');
-                    header('Cache-Control: public');
-
                     $html = file_get_contents($pageFile);
                     $page = new ExPage_Gallery($html);
 
                     $url = $page->getThumbnailUrl();
-                    
+                    if (!$url) {
+                        http_response_code(404);
+                        exit;
+                    }
+
                     $ch = curl_init($url);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_FAILONERROR, true);
                     curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+                    // a web request: a slow or unreachable ExHentai must not hold the worker (B12)
+                    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
                     $cookie = Config::buildCookie();
                     curl_setopt($ch, CURLOPT_COOKIE, $cookie);
                     curl_setopt($ch, CURLOPT_USERAGENT, ExClient::USER_AGENT);
-                    
+
                     $ret = curl_exec($ch);
-                    
-                    $im = $ret ? imagecreatefromstring($ret) : false;
-                    if ($im) {
-                        imagejpeg($im);
+
+                    $im = $ret ? @imagecreatefromstring($ret) : false;
+                    if (!$im) {
+                        // no cache headers: the browser asks again next time
+                        http_response_code(502);
+                        exit;
                     }
+
+                    header('Content-Type: image/jpeg');
+                    header('Last-Modified: '.gmdate('D, d M Y H:i:s', strtotime($gallery->posted)).' GMT');
+                    header('Expires: '.gmdate('D, d M Y H:i:s', strtotime('+1 year')).' GMT');
+                    header('Cache-Control: public');
+                    imagejpeg($im);
                 } else {
                     http_response_code(404);
                 }

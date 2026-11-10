@@ -9,7 +9,7 @@ use Tests\Support\Stack;
 use Tests\Support\ZipFactory;
 
 /**
- * Reader pages (archiveimage), thumbnails/covers (gallerythumb) and archive downloads.
+ * Reader pages (archiveimage), thumbnails/covers (gallerythumb, exgallerythumb) and archive downloads.
  */
 final class ApiImageTest extends TestCase
 {
@@ -165,6 +165,68 @@ final class ApiImageTest extends TestCase
     {
         $this->assertSame(400, Api::request('gallerythumb', array('id' => self::$gallery, 'index' => 0, 'type' => 3))['status']);
         $this->assertSame(404, Api::request('gallerythumb', array('id' => self::$gallery, 'index' => 50, 'type' => 2))['status']);
+    }
+
+    /**
+     * A not yet archived gallery whose stored ExHentai page has the given cover style (exgallerythumb).
+     */
+    private static function exGallery(string $coverStyle): int
+    {
+        static $exhenid = 900000;
+        $exhenid++;
+        Db::exec("insert into gallery (exhenid, hash, name, posted, archived) values (?, 'abc', 'Ex Cover', '2020-01-02 03:04:00', 0)",
+            array($exhenid));
+        $pages = Stack::archivePath('pages');
+        if (!is_dir($pages)) {
+            mkdir($pages, 0777, true);
+        }
+        file_put_contents("$pages/$exhenid.html", '<html><body><div id="gd1"><div style="'.$coverStyle.'"></div></div></body></html>');
+
+        return (int)Db::value('select id from gallery where exhenid = ?', array($exhenid));
+    }
+
+    private static function exCover(string $name): string
+    {
+        $base = getenv('FAKE_EXHENTAI_URL') ?: 'http://127.0.0.1:8090';
+
+        return "width:250px; height:354px; background:transparent url($base/thumb/$name.jpg) 0 0 no-repeat";
+    }
+
+    public function testExGalleryThumb(): void
+    {
+        $response = Api::request('exgallerythumb', array('id' => self::exGallery(self::exCover('cover'))));
+
+        $this->assertSame(200, $response['status']);
+        $this->assertSame('image/jpeg', $response['headers']['content-type']);
+        $this->assertSame('public', $response['headers']['cache-control']);
+        $this->assertSame(array(20, 30), array_slice(getimagesizefromstring($response['body']), 0, 2));
+    }
+
+    public function testExGalleryThumbFailureIsNotCached(): void
+    {
+        $response = Api::request('exgallerythumb', array('id' => self::exGallery(self::exCover('missing'))));
+
+        $this->assertSame(502, $response['status']);
+        $this->assertArrayNotHasKey('cache-control', $response['headers']);
+        $this->assertArrayNotHasKey('expires', $response['headers']);
+    }
+
+    public function testExGalleryThumbTimesOut(): void
+    {
+        $id = self::exGallery(self::exCover('hang'));
+
+        $start = microtime(true);
+        $response = Api::request('exgallerythumb', array('id' => $id));
+        $seconds = microtime(true) - $start;
+
+        $this->assertSame(502, $response['status']);
+        $this->assertLessThan(13, $seconds, 'gives up after 10 s');
+        $this->assertArrayNotHasKey('cache-control', $response['headers']);
+    }
+
+    public function testExGalleryThumbWithoutCoverInPage(): void
+    {
+        $this->assertSame(404, Api::request('exgallerythumb', array('id' => self::exGallery('color:red')))['status']);
     }
 
     public function testDownload(): void
