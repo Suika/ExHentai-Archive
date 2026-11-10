@@ -7,7 +7,6 @@ class ExArchiver
     protected $client;
     protected $archiveDir;
     protected $config;
-    protected $cache;
 
     /** set when ExHentai answers "Insufficient Credits.": no further downloads in this run */
     protected $outOfCredits = false;
@@ -17,8 +16,6 @@ class ExArchiver
         $this->client = new ExClient();
 
         $this->config = Config::get();
-        $this->cache = Cache::getInstance();
-
         $this->archiveDir = $this->config->archiveDir.'/galleries';
         if (!is_dir($this->archiveDir)) {
             mkdir($this->archiveDir, 0777, true);
@@ -155,8 +152,6 @@ class ExArchiver
     protected function archiveGallery($gallery)
     {
         Log::debug(self::LOG_TAG, 'Archiving gallery: #%d', $gallery->exhenid);
-
-        $this->cache->deleteObject('gallery', $gallery->id);
 
         $galleryHtml = $this->client->gallery($gallery->exhenid, $gallery->hash);
         if (!$galleryHtml || $this->client->lastStatus >= 500) { // no answer, or a server error page

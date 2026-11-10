@@ -1,6 +1,6 @@
 #!/bin/sh
 # Entry point of the test image (Dockerfile target "test", docker-compose.test.yml).
-# Starts the normal app stack (nginx, php-fpm pools, memcached) plus the fake ExHentai server,
+# Starts the normal app stack (nginx, php-fpm pools) plus the fake ExHentai server,
 # then runs PHPUnit with the given arguments, e.g. "--testsuite unit" or "--filter ApiReadTest".
 set -e
 

@@ -19,7 +19,6 @@
         "symfony/dom-crawler": "^8.1"
     },
     "suggest": {
-        "ext-memcached": "Enables the gallery cache (classes/Cache.php)",
         "ext-posix": "Used by TaskRunner.php to detect already running tasks"
     },
     "config": {

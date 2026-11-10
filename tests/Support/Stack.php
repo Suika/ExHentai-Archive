@@ -30,15 +30,7 @@ final class Stack
             self::emptyDir(APP_ROOT.'/'.$dir);
         }
 
-        self::flushCache();
         self::fake()->reset();
-    }
-
-    public static function flushCache(): void
-    {
-        $memcached = new \Memcached();
-        $memcached->addServer('127.0.0.1', 11211);
-        $memcached->flush();
     }
 
     /**

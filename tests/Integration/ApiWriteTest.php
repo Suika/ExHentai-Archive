@@ -105,12 +105,7 @@ final class ApiWriteTest extends TestCase
 
     public function testHealthCheck(): void
     {
-        $this->assertSame(array('database' => true, 'search' => true, 'cache' => true), Api::data('test'));
-    }
-
-    public function testFlush(): void
-    {
-        $this->assertSame('Cache flushed', Api::data('flush'));
+        $this->assertSame(array('database' => true, 'search' => true), Api::data('test'));
     }
 
     public function testUnknownGalleryIsNotCreated(): void

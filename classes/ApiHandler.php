@@ -38,41 +38,23 @@ class ApiHandler
             $data['end'] = true;
         }
 
-        $config = Config::get();
-        $cache = Cache::getInstance();
-
         foreach ($result as $row) {
-            $galleryId = $row['id'];
+            $gallery = R::load('gallery', $row['id']);
+            $export = $gallery->export();
 
-            $export = null;
-
-            $export = $cache->getObject('gallery', $galleryId);
-            if ($export) {
-                $export['fromcache'] = true;
+            $thumb = $gallery->getThumbnail(0, Model_Gallery::THUMB_LARGE, false); //don't generate a thumb now
+            if ($thumb) {
+                $export['thumb'] = array(
+                    'url' => $thumb->getUrl(),
+                    'landscape' => ($thumb->width > $thumb->height)
+                );
             }
-            
-            if (!$export) {
-                $gallery = R::load('gallery', $galleryId);
-                $export = $gallery->export();
 
-                $thumb = $gallery->getThumbnail(0, Model_Gallery::THUMB_LARGE, false); //don't generate a thumb now
-                if ($thumb) {
-                    $export['thumb'] = array(
-                        'url' => $thumb->getUrl(),
-                        'landscape' => ($thumb->width > $thumb->height)
-                    );
-                }
+            $export['tags'] = $gallery->exportTags();
 
-                $export['tags'] = $gallery->exportTags();
+            $export['posted_formatted'] = date('d/m/Y', strtotime($gallery->posted));
 
-                $export['posted_formatted'] = date('d/m/Y', strtotime($gallery->posted));
-
-                $export['fromcache'] = false;
-                
-                $export['source'] = $gallery->exportSource();
-
-                $cache->setObject('gallery', $galleryId, $export);
-            }
+            $export['source'] = $gallery->exportSource();
 
             if (array_key_exists('ranked_weight', $row)) {
                 $export['ranked_weight'] = $row['ranked_weight'];
@@ -210,11 +192,6 @@ class ApiHandler
             if ($gallery->id) {
                 $thumb = $gallery->getThumbnail($index, $type, true);
                 if ($thumb) {
-                    if ($index == 0) {
-                        $cache = Cache::getInstance();
-                        $cache->deleteObject('gallery', $gallery->id);
-                    }
-
                     header('Location: '.$thumb->getUrl());
                 } else {
                     http_response_code(404);
@@ -381,26 +358,6 @@ class ApiHandler
         $this->sendSuccess($result);
     }
 
-    public function flushAction()
-    {
-        $config = Config::get();
-        $cache = Cache::getInstance();
-
-        if ($cache->cacheConnected()) {
-            $ret = $cache->flush();
-            
-            sleep(1);
-            
-            if ($ret) {
-                $this->sendSuccess('Cache flushed');
-            } else {
-                $this->sendFail('Failed to flush cache');
-            }
-        } else {
-            $this->sendFail('Cache not connected');
-        }
-    }
-
     public function indexerAction()
     {
         header('Content-Type: text/plain');
@@ -420,7 +377,7 @@ class ApiHandler
     }
 
     /**
-     * Health check: database, search index and cache reachable.
+     * Health check: database and search index reachable.
      * (It used to call a gallery method that no longer exists and crashed.)
      */
     public function testAction()
@@ -441,8 +398,6 @@ class ApiHandler
             $checks['search'] = false;
         }
 
-        $checks['cache'] = Cache::getInstance()->cacheConnected();
-
         $this->sendSuccess($checks);
     }
     
@@ -456,9 +411,6 @@ class ApiHandler
         if ($gallery->id) {
             $gallery->read = $status;
             R::store($gallery);
-            
-            $cache = Cache::getInstance();
-            $cache->deleteObject('gallery', $gallery->id);
 
             $this->sendSuccess($gallery->read);
         } else {
@@ -476,9 +428,6 @@ class ApiHandler
         if ($gallery->id) {
             $gallery->color = $color;
             R::store($gallery);
-            
-            $cache = Cache::getInstance();
-            $cache->deleteObject('gallery', $gallery->id);
 
             $this->sendSuccess($gallery->color);
         } else {

@@ -12,10 +12,10 @@ RUN composer install --no-interaction --no-progress --prefer-dist --optimize-aut
 
 FROM debian:trixie-slim AS app
 ENTRYPOINT [ "sh", "/entrypoint.sh" ]
-# Healthy when nginx, php-fpm, the database, the search index and the cache answer (api.php?action=test)
+# Healthy when nginx, php-fpm, the database and the search index answer (api.php?action=test)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5m --retries=3 \
   CMD wget --quiet --tries=1 -O - "http://localhost:${NGINX_PORT}/api.php?action=test" \
-  | grep -q '"database":true,"search":true,"cache":true' || exit 1
+  | grep -q '"database":true,"search":true' || exit 1
 WORKDIR /var/www/exhen
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -27,7 +27,6 @@ RUN apt-get update && \
     tzdata \
     gettext-base \
     nginx \
-    memcached \
     supervisor \
     p7zip-full \
     sqlite3 \
@@ -39,7 +38,6 @@ RUN apt-get update && \
     php8.4-gd \
     php8.4-intl \
     php8.4-mbstring \
-    php8.4-memcached \
     php8.4-sqlite3 \
     # not used, but RedBean 5.7 reads a pdo_mysql constant when it is loaded
     php8.4-mysql \
@@ -76,8 +74,6 @@ ENV DB_PATH=/var/www/exhen/data/exhen.sqlite \
     EX_SK=changeme \
     EX_SP=2 \
     EX_HATHPERKS=m1.m2.m3.tf.t1.t2.t3.p1.p2.s-210aa44613 \
-    MEMCACHED_HOST=127.0.0.1 \
-    MEMCACHED_PORT=11211 \
     SUPERVISOR_PORT=9001 \
     NGINX_PORT=6767 \
     DOLLAR='$' \

@@ -18,7 +18,6 @@ class Task_Thumbnails extends Task_Abstract {
 				Log::debug(self::LOG_TAG, 'Gallery #%d has %d pages, not %d', $gallery->id, $pages, $gallery->numfiles);
 				$gallery->numfiles = $pages;
 				R::store($gallery);
-				Cache::getInstance()->deleteObject('gallery', $gallery->id);
 			}
 
         	for($i = 0; $i < $gallery->numfiles; $i++) {
@@ -47,7 +46,6 @@ class Task_Thumbnails extends Task_Abstract {
 	 * at once and galleries that fail (e.g. missing zip) are not retried in an endless loop.
 	 */
 	protected function generateCovers() {
-		$cache = Cache::getInstance();
 		$created = 0;
 		$failed = 0;
 		$lastId = 0;
@@ -75,8 +73,6 @@ class Task_Thumbnails extends Task_Abstract {
 
 				if ($thumb) {
 					$created++;
-					// cached list entries don't know the new cover yet (same as api.php?action=gallerythumb)
-					$cache->deleteObject('gallery', $gallery->id);
 				} else {
 					$failed++;
 					Log::error(self::LOG_TAG, 'Failed to create cover for gallery #%d (%s)', $gallery->id, $gallery->name);

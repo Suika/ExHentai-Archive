@@ -19,10 +19,6 @@
     "default": {
         "db": {
             "dsn": "sqlite:${DB_PATH}"
-        },
-        "memcache": {
-            "host": "${MEMCACHED_HOST}",
-            "port": ${MEMCACHED_PORT}
         }
     }
 }

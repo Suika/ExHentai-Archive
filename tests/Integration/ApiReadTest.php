@@ -52,8 +52,6 @@ final class ApiReadTest extends TestCase
 
         Api::data('update', array('id' => self::$rotten, 'readStatus' => 1));
         Api::data('updateColor', array('id' => self::$pixiv, 'color' => 'red'));
-
-        Stack::flushCache();
     }
 
     private static function ids(array $data): array
@@ -196,16 +194,6 @@ final class ApiReadTest extends TestCase
 
         $this->assertContains(self::$unarchived, $ids);
         $this->assertNotContains(self::$unarchived, self::ids(self::list()));
-    }
-
-    public function testListEntriesAreCached(): void
-    {
-        self::list();
-        $data = self::list();
-
-        foreach ($data['galleries'] as $gallery) {
-            $this->assertTrue($gallery['fromcache']);
-        }
     }
 
     public function testGallery(): void

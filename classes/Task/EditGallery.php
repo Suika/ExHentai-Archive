@@ -55,9 +55,6 @@ class Task_EditGallery extends Task_Abstract {
 		}
 
 		R::store($gallery);
-
-		$cache = Cache::getInstance();
-		$cache->deleteObject('gallery', $gallery->id);
 	}
 	
 }

@@ -6,8 +6,6 @@ class Task_Cleanup extends Task_Abstract {
 	
 	public function run($options = array()) {
 		$config = Config::get();
-        $cache = Cache::getInstance();
-        
 		Log::debug(self::LOG_TAG, 'Checking for NULL galleryproperty entries');
 		
 		$entries = R::getAll('SELECT * FROM galleryproperty WHERE gallery_id IS NULL');
@@ -99,8 +97,6 @@ class Task_Cleanup extends Task_Abstract {
                     R::store($gallery);
                 }
                 
-                // R::trash() resets the bean id to 0, so use the id from the query
-                $cache->deleteObject('gallery', $entry["id"]);
                 $count++;
 			}
 			Log::debug(self::LOG_TAG, 'All galleries marked as deleted were deleted. Total deleted was %d', $count);

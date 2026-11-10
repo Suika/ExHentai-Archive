@@ -159,9 +159,6 @@ class Task_Audit extends Task_Abstract {
                     Log::debug(static::LOG_TAG, 'Different tags found for gallery: #%d - %s (%s)', $gallery->exhenid, $gallery->name, $humanDiff);
                     $gallery->ownGalleryTag = array();
                     $gallery->addTags($newTags);
-
-                    $cache = Cache::getInstance();
-                    $cache->deleteObject('gallery', $gallery->id);
                 }
             }
         }

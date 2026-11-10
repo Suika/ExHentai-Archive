@@ -35,7 +35,7 @@ final class Snapshot
      * Removes values that change from run to run (timings, cache flags, timestamps of the test run) and
      * the archive size (depends on the image encoder of the build, not on the app).
      */
-    public static function normalize($data, array $drop = array('time', 'fromcache', 'added', 'updated', 'lastaudit', 'filesize'))
+    public static function normalize($data, array $drop = array('time', 'added', 'updated', 'lastaudit', 'filesize'))
     {
         if (!is_array($data)) {
             return $data;
