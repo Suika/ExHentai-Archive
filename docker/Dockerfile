@@ -74,7 +74,6 @@ ENV DB_PATH=/var/www/exhen/data/exhen.sqlite \
     EX_SK=changeme \
     EX_SP=2 \
     EX_HATHPERKS=m1.m2.m3.tf.t1.t2.t3.p1.p2.s-210aa44613 \
-    SUPERVISOR_PORT=9001 \
     NGINX_PORT=6767 \
     DOLLAR='$' \
     TZ=Europe/London \
