@@ -9,6 +9,10 @@ class ExClient
     /** HTTP status and curl error of the last exec() request, for log messages */
     public $lastStatus = 0;
     public $lastError = '';
+    /** curl_getinfo() of the last exec()/buttonPress() request (effective URL, content type, redirects, times) */
+    public $lastInfo = array();
+    /** raw response headers of the last exec()/buttonPress() request, of every response when redirected */
+    public $lastHeaders = '';
 
     const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
 
@@ -44,7 +48,7 @@ class ExClient
         return $url;
     }
 
-    protected static function userAgent()
+    public static function userAgent()
     {
         return (string)self::setting('userAgent', self::USER_AGENT);
     }
@@ -160,9 +164,10 @@ class ExClient
             curl_setopt($ch, CURLOPT_COOKIE, Config::buildCookie());
             curl_setopt($ch, CURLOPT_USERAGENT, self::userAgent());
 
+            $this->recordHeaders($ch);
+
             $ret = curl_exec($ch);
-            $this->lastStatus = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-            $this->lastError = $ret === false ? curl_error($ch) : '';
+            $this->recordResult($ch, $ret);
 
             self::checkBan($ret);
 
@@ -203,9 +208,10 @@ class ExClient
             curl_setopt($ch, CURLOPT_COOKIE, $cookie);
             curl_setopt($ch, CURLOPT_USERAGENT, self::userAgent());
             
+            $this->recordHeaders($ch);
+
             $ret = curl_exec($ch);
-            $this->lastStatus = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-            $this->lastError = $ret === false ? curl_error($ch) : '';
+            $this->recordResult($ch, $ret);
 
             self::checkBan($ret);
             
@@ -216,6 +222,24 @@ class ExClient
         return "";
     }
     
+    /** collects the response headers into $lastHeaders */
+    protected function recordHeaders($ch)
+    {
+        $this->lastHeaders = '';
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $line) {
+            $this->lastHeaders .= $line;
+            return strlen($line);
+        });
+    }
+
+    /** status, error and curl_getinfo() of a finished request, for log messages and Task_ArchiveDebug */
+    protected function recordResult($ch, $ret)
+    {
+        $this->lastStatus = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $this->lastError = $ret === false ? curl_error($ch) : '';
+        $this->lastInfo = curl_getinfo($ch);
+    }
+
     public function invalidateForm($url)
     {
         $ch = curl_init($this->url($url));

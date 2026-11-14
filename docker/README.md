@@ -82,6 +82,10 @@ docker compose build
 
 Rebuild the search index by hand (normally never needed): `api.php?action=indexer`
 
+A gallery doesn't download? `docker exec -u www-data -w /var/www/exhen exhen php TaskRunner.php ArchiveDebug <gid>`
+shows what ExHentai answers and saves the pages in `/var/www/exhen/tmp/archive-debug/`. Add `download` to also
+press the download button (costs GP like a normal run). The database is not changed.
+
 ## 2. Migration from MySQL/MariaDB to SQLite
 
 Ids are kept, so the images and archive folders stay as they are.

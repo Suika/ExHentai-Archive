@@ -174,7 +174,8 @@ class ExArchiver
                     R::store($gallery);
                 }
             } else {
-                Log::error(self::LOG_TAG, 'Gallery #%d: ExHentai returned no gallery page (removed or invalid)', $gallery->exhenid);
+                Log::error(self::LOG_TAG, 'Gallery #%d: ExHentai returned no gallery page (removed or invalid): HTTP %d, "%s": "%s"',
+                    $gallery->exhenid, $this->client->lastStatus, $galleryPage->getTitle(), $galleryPage->getVisibleText(150));
             }
             return;
         }
@@ -266,7 +267,7 @@ class ExArchiver
      *
      * @return string|null null on success, otherwise what went wrong (HTTP status, SSL/connection error, timeout)
      */
-    protected function download($url, $targetFile)
+    public function download($url, $targetFile)
     {
         $timeout = (int)($this->config->exhentai->downloadTimeout ?? 120);
         $context = stream_context_create(array(

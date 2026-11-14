@@ -26,6 +26,33 @@ abstract class ExPage_Abstract
         return $this->doc->filter($selector);
     }
 
+    /** the page's <title>, '' when it has none */
+    public function getTitle()
+    {
+        return trim(preg_replace('/\s+/', ' ', self::text($this->find('title')->first())));
+    }
+
+    /**
+     * The visible text of the page (without scripts and styles), whitespace collapsed, cut to $max characters.
+     * For log messages about pages the app did not expect.
+     */
+    public function getVisibleText($max = 300)
+    {
+        $root = $this->doc->getNode(0);
+        if (!$root) {
+            return '';
+        }
+
+        $xpath = new DOMXPath($root->ownerDocument);
+        $text = '';
+        foreach ($xpath->query('//body//text()[not(ancestor::script)][not(ancestor::style)]') as $node) {
+            $text .= ' '.$node->textContent;
+        }
+        $text = trim(preg_replace('/[\s\x{a0}]+/u', ' ', $text));
+
+        return mb_strlen($text) > $max ? mb_substr($text, 0, $max).'...' : $text;
+    }
+
     /**
      * Text of all matched nodes, mirroring phpQuery's text():
      * the raw textContent of every node, with a "\n" appended to each non-empty
