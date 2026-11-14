@@ -60,10 +60,30 @@ class ExClient
      */
     protected static function checkBan($response)
     {
-        if (is_string($response) && stripos($response, 'Your IP address has been temporarily banned') !== false) {
-            $expires = self::banExpiry($response);
-            throw new ExClient_BannedException('IP temporarily banned by ExHentai'.($expires ? ', expires in '.$expires : ''));
+        $message = self::banMessage($response);
+        if ($message !== null) {
+            throw new ExClient_BannedException($message);
         }
+    }
+
+    /**
+     * null when $response is not ExHentai's IP ban page ("This IP address has been temporarily banned ...",
+     * formerly "Your IP address ..."), otherwise "IP temporarily banned by ExHentai, expires in <time>", or the
+     * page's own text when the time can't be read from it.
+     */
+    public static function banMessage($response)
+    {
+        if (!is_string($response) || stripos($response, 'IP address has been temporarily banned') === false) {
+            return null;
+        }
+
+        $expires = self::banExpiry($response);
+        if ($expires !== null) {
+            return 'IP temporarily banned by ExHentai, expires in '.$expires;
+        }
+
+        $text = trim(preg_replace('/\s+/', ' ', strip_tags($response)));
+        return sprintf('IP temporarily banned by ExHentai: "%s"', mb_strlen($text) > 300 ? mb_substr($text, 0, 300).'...' : $text);
     }
 
     /**

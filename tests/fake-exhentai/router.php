@@ -78,8 +78,10 @@ if ($pageRequest && !empty($block['count'])) {
             send('<html><body><h1>503 Service Unavailable</h1></body></html>', 503);
         }
         if ($block['type'] === 'ban') {
-            send('Your IP address has been temporarily banned for excessive pageloads which indicates that you are using '
-                .'automated mirroring/harvesting software. The ban expires in '.($block['expires'] ?? '59 minutes and 48 seconds'));
+            // ExHentai's current wording (HTTP 200, plain text)
+            send('This IP address has been temporarily banned due to an excessive request rate. This probably means you '
+                .'are using automated mirroring/harvesting software or share the IP address with someone who does. '
+                .'The ban expires in '.($block['expires'] ?? '59 minutes and 48 seconds'));
         }
         send('<html><body>You are opening pages too fast, thus placing a heavy load on the server. Back down, or your IP '
             .'address will be automatically banned.</body></html>');
