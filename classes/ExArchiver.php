@@ -173,6 +173,13 @@ class ExArchiver
                     $gallery->hasmeta = true;
                     R::store($gallery);
                 }
+            } elseif (!$gallery->archived && stripos($galleryHtml, 'Gallery not found') !== false
+                && strtotime((string)$gallery->added) < time() - 7 * 86400) {
+                // "If you just added this gallery, you may have to wait a short while": after a week it won't come
+                Log::error(self::LOG_TAG, 'Gallery #%d: "Gallery not found" and added more than a week ago, download disabled', $gallery->exhenid);
+                $gallery->download = false;
+                $gallery->hasmeta = true;
+                R::store($gallery);
             } else {
                 Log::error(self::LOG_TAG, 'Gallery #%d: ExHentai returned no gallery page (removed or invalid): HTTP %d, "%s": "%s"',
                     $gallery->exhenid, $this->client->lastStatus, $galleryPage->getTitle(), $galleryPage->getVisibleText(150));

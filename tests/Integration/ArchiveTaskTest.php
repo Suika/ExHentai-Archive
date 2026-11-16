@@ -275,6 +275,28 @@ final class ArchiveTaskTest extends TestCase
         $this->assertSame(array(), Stack::fake()->requests(), 'not fetched again by the next run');
     }
 
+    public function testGalleryNotFoundDisablesTheDownloadAfterAWeek(): void
+    {
+        $notFound = 'Gallery not found. If you just added this gallery, you may have to wait a short while before it '
+            .'becomes available. It might also have been reverted to its previous version.';
+        Stack::fake()->galleryHtml(self::GID, $notFound);
+        Api::data('addgallery', array('gid' => self::GID, 'token' => self::TOKEN));
+
+        $result = $this->archive();
+        $this->assertStringContainsString('ExHentai returned no gallery page', $result['output'], 'just added: tried again');
+        $this->assertSame('1', (string)Db::galleryByExhenid(self::GID)['download']);
+
+        Db::exec("update gallery set added = datetime('now', 'localtime', '-8 days') where exhenid = ?", array(self::GID));
+        $result = $this->archive();
+        $this->assertStringContainsString('"Gallery not found" and added more than a week ago, download disabled', $result['output']);
+        $row = Db::galleryByExhenid(self::GID);
+        $this->assertSame(array('0', '0', '1'), array((string)$row['download'], (string)$row['archived'], (string)$row['hasmeta']));
+
+        Stack::fake()->clearRequests();
+        $this->archive();
+        $this->assertSame(array(), Stack::fake()->requests(), 'not fetched again by the next run');
+    }
+
     public function testInvalidPageKeepsTheMetadata(): void
     {
         $this->queue();
