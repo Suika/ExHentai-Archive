@@ -274,7 +274,7 @@ class ExArchiver
      *
      * @return string|null null on success, otherwise what went wrong (HTTP status, SSL/connection error, timeout)
      */
-    public function download($url, $targetFile)
+    protected function download($url, $targetFile)
     {
         $timeout = (int)($this->config->exhentai->downloadTimeout ?? 120);
         $context = stream_context_create(array(

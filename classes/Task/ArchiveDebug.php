@@ -73,7 +73,7 @@ class Task_ArchiveDebug extends Task_Abstract {
 	}
 
 	protected function debug($gid, $token, $download, $keep) {
-		$this->out('User agent: %s', ExClient::userAgent());
+		$this->out('User agent: %s', Config::get()->exhentai->userAgent ?? ExClient::USER_AGENT); // as ExClient::userAgent()
 		$cookies = array();
 		foreach (Config::get()->cookie as $name => $value) {
 			$cookies[] = $name.($value === '' || $value === null ? ' (EMPTY)' : ' (set)');
@@ -141,7 +141,10 @@ class Task_ArchiveDebug extends Task_Abstract {
 		}
 		$this->out('Downloading %s', $url);
 		$start = microtime(true);
-		$error = (new ExArchiver())->download($url, $target);
+		$archiver = new class extends ExArchiver { // the Archive task's own download, made callable here
+			public function download($url, $targetFile) { return parent::download($url, $targetFile); }
+		};
+		$error = $archiver->download($url, $target);
 		$bytes = is_file($target) ? filesize($target) : 0;
 		$this->out('Download: %s, %d bytes in %.1f s', $error === null ? 'OK' : 'FAILED: '.$error, $bytes, microtime(true) - $start);
 

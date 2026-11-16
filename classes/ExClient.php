@@ -48,7 +48,7 @@ class ExClient
         return $url;
     }
 
-    public static function userAgent()
+    protected static function userAgent()
     {
         return (string)self::setting('userAgent', self::USER_AGENT);
     }
